@@ -1,5 +1,7 @@
 import os
 import sys
+import random
+from itertools import cycle
 
 sys.path.append("../")
 import torch
@@ -18,7 +20,9 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "fordebug"
+    modelname = "mlp1layer"
+    # modelname = "fordebug"
+
     datname = "OneDsignal"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -33,7 +37,6 @@ def main():
     myseed = cfg_train["seed"]
 
     torch.manual_seed(myseed)
-    np.random.seed(42)
     configs = {}
     configs["train"] = cfg_train
     configs["model"] = cfg_model
@@ -48,6 +51,13 @@ def main():
 
 class DF_Trainer(object):
     def __init__(self, configs):
+        seed = 1
+        self.seed = seed
+        torch.cuda.empty_cache()
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+
         self.configs = configs
         self.dtype = torch.float64
 
@@ -66,9 +76,6 @@ class DF_Trainer(object):
             setattr(self, attr, self.configs["train"][attr])
 
     def _set_data(self):
-        torch.manual_seed(0)
-        np.random.seed(42)
-
         data_args = self.configs["data"]
         # self.data = SequentialMNIST_double(**data_args)
         self.data = yu.load_component(data_args)
@@ -78,6 +85,8 @@ class DF_Trainer(object):
         self.eval_data = yu.load_component(eval_data_args)
 
     def _set_loader(self):
+        torch.manual_seed(self.seed)
+
         self.loader = DataLoader(
             self.data,
             batch_size=self.configs["train"]["batchsize"],
@@ -106,69 +115,15 @@ class DF_Trainer(object):
         return cfglist
 
     def _set_models(self):
-        if "nftmodel" in self.configs["model"].keys():
-            DFNFTclass = yu.load_component_fxn(self.configs["model"]["nftmodel"])
+        cfg_model = self.configs["model"]
+        enc_class = yu.load_component_fxn(cfg_model["encmodel"])
+        dec_class = yu.load_component_fxn(cfg_model["decmodel"])
 
-        else:
-            DFNFTclass = ftd.DFNFT
-
-        if "reload" in self.configs["model"].keys():
-            expname = self.configs["model"]["reload"]
-            exppath = os.path.join("./dnftresult", expname)
-            if not os.path.exists(exppath):
-                raise NotImplementedError
-            mymodelpath = f"""{exppath}/model.pt"""
-            self.nftmodel = torch.load(mymodelpath)
-            print(f"""Begin restarting from the model of {mymodelpath}. """)
-            print("WARNING : We ARE RELOADING A MODEL" * 10)
-
-        else:
-            cfg_model = self.configs["model"]
-
-            enc_class = yu.load_component_fxn(cfg_model["encmodel"])
-            dec_class = yu.load_component_fxn(cfg_model["decmodel"])
-
-            model_args = cfg_model["modelargs"]
-            nft_args = cfg_model["nftargs"]
-
-            if "num_register_tokens" in model_args.keys():
-                matsize = model_args["num_register_tokens"]
-            else:
-                matsize = (
-                    model_args["dim_a"]
-                    if nft_args["is_Dimside"] == True
-                    else model_args["dim_m"]
-                )
-
-            cfglist = self.create_configs(nft_args["depth"], model_args)
-            dec_cfglist = copy.deepcopy(cfglist)
-            if "," in str(model_args["depth"]):
-                depthlist = model_args["depth"].split(",")
-                for k in range(len(cfglist)):
-                    cfglist[k]["depth"] = int(depthlist[k])
-                    dec_cfglist[k]["depth"] = int(depthlist[k])
-
-            if {"dim_m", "dim_a"}.issubset(model_args):
-                for k in range(1, len(cfglist)):
-                    cfglist[k]["dim_data"] = (
-                        cfglist[k - 1]["dim_m"] * cfglist[k - 1]["dim_a"]
-                    )
-                    dec_cfglist[k]["dim_data"] = (
-                        cfglist[k - 1]["dim_m"] * cfglist[k - 1]["dim_a"]
-                    )
-            nft_list = []
-            owndec_list = []
-
-            for k in range(nft_args["depth"]):
-                enc1 = enc_class(**cfglist[k])
-                dec1 = dec_class(**dec_cfglist[k])
-                dec1a = dec_class(**dec_cfglist[k])
-                nft1 = ftd.NFT(encoder=enc1, decoder=dec1, **nft_args)
-                nft_list.append(nft1)
-                owndec_list.append(dec1a)
-
-            # self.nftmodel = DFNFTclass(nftlist=nft_list, owndecoders=owndec_list)
-        self.nftmodel = nft_list[0]
+        model_args = cfg_model["modelargs"]
+        nft_args = cfg_model["nftargs"]
+        enc1 = enc_class(**model_args, require_input_adapter=True)
+        dec1 = dec_class(**model_args, require_input_adapter=True)
+        self.nftmodel = ftd.NFT(encoder=enc1, decoder=dec1, **nft_args)
         self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT
 
@@ -176,9 +131,16 @@ class DF_Trainer(object):
 
     def train(self):
         self.nftmodel.train().to(dtype=self.dtype).to(self.device)
+        loader_iter = cycle(self.loader)
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
-            seqs = next(iter(self.loader)).to(dtype=self.dtype).to(self.device)
+            [seqs, label] = next(loader_iter)
+            seqs = seqs.to(dtype=self.dtype).to(self.device)
+            # print(f"""Debug label is {label}""")
+            # print(seqs[0, 0, :10])
+            # print(seqs[0, 1, :10])
+
+            # print(self.nftmodel.encoder.enc.lin1.bias[:10])
             # seqs:   N T instance_shape
             n, t = seqs.shape[:2]
             trainT = self.trainT
@@ -188,7 +150,7 @@ class DF_Trainer(object):
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
 
-            loss["all_loss"].backward()
+            loss["predloss"].backward()
             self.optimizer.step()
 
             all_loss = loss["all_loss"].item()
@@ -219,7 +181,8 @@ class DF_Trainer(object):
 
     def evaluate(self):
         self.nftmodel = self.nftmodel.eval()
-        evalseq = (self.eval_data[1].to(dtype=self.dtype))[None, :]
+        evalseq, label = self.eval_data[1]
+        evalseq = (evalseq.to(dtype=self.dtype))[None, :]
         self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
         self.nftmodel = self.nftmodel.train()
 
