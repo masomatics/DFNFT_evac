@@ -18,14 +18,13 @@ class Shifted_FreqFun:
         self,
         Ndata=5000,  # Number of data
         num_sample_points=128,  # Number of observation points
-        T=3,  # Time steps in a sequence
+        num_shifts=3,  # Time steps in a sequence
         shift_label=False,
         indexing=False,
         fixedM=False,
         batchM_size=1,
         shift_range=2,  # frequency N/(5*shift_range)
         max_shift=[0.0, 2 * math.pi / 2],  # range of shift action
-        max_T=5,
         shared_transition=False,
         rng=None,
         nfreq=5,  # Number of selected frequecy to make a function
@@ -40,8 +39,7 @@ class Shifted_FreqFun:
         smallfreqs_num=0,
         smallfreq_strength=0,
     ):
-        self.T = T
-        self.max_T = max_T
+        self.num_shifts = num_shifts
         self.Ndata = Ndata
         self.num_sample_points = num_sample_points
         self.ns = ns
@@ -160,7 +158,7 @@ class Shifted_FreqFun:
             shift = self.shifts[i]
 
         fvals = []
-        for t in range(self.T):
+        for t in range(self.num_shifts):
             sft_idx = int(
                 np.floor(t * shift * self.num_sample_points / (2 * math.pi))
             )  # time point corresponding to shift
@@ -187,12 +185,11 @@ class Shifted_FreqFun_nl:
         self,
         Ndata=5000,  # Number of data
         num_sample_points=128,  # Number of observation points
-        T=3,  # Time steps in a sequence
+        num_shifts=3,  # Time steps in a sequence
         shift_label=False,
         batchM_size=1,
         shift_range=2,
         max_shift=[0.0, 2 * math.pi / 2],  # range of shift action (in radian)
-        max_T=5,
         shared_transition=False,
         rng=None,
         nfreq=5,  # Number of selected frequecy to make a function
@@ -208,8 +205,7 @@ class Shifted_FreqFun_nl:
         smallfreqs_num=0,
         smallfreqs_strength=0,
     ):
-        self.T = T
-        self.max_T = max_T
+        self.num_shifts = num_shifts
         self.Ndata = Ndata
         self.num_sample_points = num_sample_points
         self.ns = ns
@@ -327,7 +323,7 @@ class Shifted_FreqFun_nl:
             shift = self.rng.uniform(self.max_shift[0], self.max_shift[1], size=1)
 
         fvals = []
-        for t in range(self.T):  # shift * t ( action up to T times)
+        for t in range(self.num_shifts):  # shift * t ( action up to T times)
             lat_t = np.power(obs_t, self.pow) - t * shift / (2 * math.pi)
             lat_t = lat_t + (lat_t < 0) * (1.0)
             fobs_t = np.matmul(

@@ -13,6 +13,8 @@ import numpy as np
 
 from misc import yaml_util as yu
 
+from module.ft_decimation import DFNFT
+
 
 def main():
     model_name = "fordebug"
@@ -74,7 +76,7 @@ class Trainer:
         self.data = yu.load_component(data_args)
         print(f"Using the datatype {self.data}")
         eval_data_args = copy.deepcopy(data_args)
-        eval_data_args["args"]["T"] = self.evalT
+        eval_data_args["args"]["num_shifts"] = self.evalT
         self.eval_data = yu.load_component(eval_data_args)
 
     def _set_loader(self):
@@ -130,7 +132,7 @@ class Trainer:
             decs.append(dec1)
             decstars.append(decStar)
 
-        self.nftmodel = nft_class(
+        self.nftmodel: DFNFT = nft_class(
             encoder=encs,
             decoder=decs,
             require_input_adapter=True,
@@ -138,7 +140,7 @@ class Trainer:
             **nft_args,
         )
         self.writer_location = f"./dnftresult/{self.configs['exp_name']}"
-        self.configs["data"]["args"]["T"] = self.trainT
+        self.configs["data"]["args"]["num_shifts"] = self.trainT
 
         print(f"Work will be saved at {self.writer_location}")
 
