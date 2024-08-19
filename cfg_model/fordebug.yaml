@@ -1,25 +1,54 @@
+# #root: /tmp/datasets/MNIST
+# encmodel:
+#   fn: ./module/mlp
+#   name: MLPEncoder
+
+# decmodel:
+#   fn: ./module/mlp
+#   name: MLPDecoder
+
+# modelargs:
+#   dim_data: 128
+#   dim_m: 10
+#   dim_a: 16
+#   predictive: True
+#   transition_model: LS
+#   activation: tanh
+
+# nftmodel: 
+#   fn: ./module/ft_decimation
+#   name: DFNFToneD
+
+# nftargs:
+#   orth_proj: False
+#   depth: 1
+#   is_Dimside: False
+
+
 #root: /tmp/datasets/MNIST
 encmodel:
-  fn: ./module/mlp
+  fn: ./module/mlp_new
   name: MLPEncoder
 
 decmodel:
-  fn: ./module/mlp
+  fn: ./module/mlp_new
   name: MLPDecoder
 
 modelargs:
   dim_data: 128
   dim_m: 10
   dim_a: 16
+  depth: 3
+  hidden_dim: 260
   predictive: True
   transition_model: LS
   activation: tanh
 
 nftmodel: 
   fn: ./module/ft_decimation
-  name: DFNFToneD
+  name: NFT
 
 nftargs:
-  orth_proj: False
+  orth_proj: True
   depth: 1
   is_Dimside: False
