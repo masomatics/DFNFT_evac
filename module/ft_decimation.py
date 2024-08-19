@@ -14,11 +14,23 @@ from module import dynamics as dyn
 
 
 class NFT(nn.Module):
-    def __init__(self, encoder, decoder, orth_proj=False, is_Dimside=False, **kwargs):
+    def __init__(
+        self,
+        encoder: list,
+        decoder: list,
+        orth_proj=False,
+        is_Dimside=False,
+        require_input_adapter=False,
+        **kwargs,
+    ):
         super().__init__()
         self.is_Dimside = is_Dimside
-        self.encoder = encoder
-        self.decoder = decoder
+        self.require_input_adapter = require_input_adapter
+        self.encoder = encoder[0]
+        self.encoder.require_input_adapter = self.require_input_adapter
+        self.decoder = decoder[0]
+        self.decoder.require_input_adapter = self.require_input_adapter
+
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
@@ -125,6 +137,7 @@ class NFT(nn.Module):
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
+        print("""!!! Visualization Rendered!!! """)
         self.visualize(evalseq, predicted, writer)
 
     def visualize(self, evalseq, predicted, writer):
@@ -137,3 +150,33 @@ class NFT(nn.Module):
         plt.legend()
 
         writer.add_figure("gt vs predicted", plt.gcf())
+
+
+class DFNFT(NFT):
+    def __init__(self, nftlist: list[NFT], owndecoders: list):
+        super().__init__(encoder=None, decoder=None)
+        self.owndecoders = nn.ModuleList(owndecoders)
+        self.nftlayers = nn.ModuleList(nftlist)
+        self.depth = len(self.nftlayers)
+        self.terminal_dynamics = nftlist[-1].dynamics
+
+        assert self.nftlayers[0].require_input_adapter == True
+
+    def do_encode(self, obs):
+        latent = obs
+        latents = []
+        for k in range(self.depth):
+            latent = self.nftlayers[k].do_encode(obs)
+            latents.append(latent)
+        return latents
+
+    def do_decode(self, latent, layer_idx_from_bottom=0):
+        # exepcts N T dim
+        batchsize = latent.shape[0]
+        latent = rearrange(latent, "n t ... -> (n t) ...")
+        for j in range(layer_idx_from_bottom, self.depth):
+            loc = self.depth - (j + 1)
+            latent = self.owndecoders[loc](latent)
+        obshat = latent
+        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
+        return obshat

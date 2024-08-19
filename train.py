@@ -20,9 +20,8 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mlp1layer"
+    modelname = "mask1layer"
     # modelname = "fordebug"
-
     datname = "OneDsignal"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -121,13 +120,26 @@ class DF_Trainer(object):
 
         model_args = cfg_model["modelargs"]
         nft_args = cfg_model["nftargs"]
-        enc1 = enc_class(**model_args, require_input_adapter=True)
-        dec1 = dec_class(**model_args, require_input_adapter=True)
-        self.nftmodel = ftd.NFT(encoder=enc1, decoder=dec1, **nft_args)
+        mask = self.create_masks(model_args)
+        enc1 = enc_class(**model_args, maskmat=mask)
+        dec1 = dec_class(**model_args, maskmat=mask)
+        self.nftmodel = ftd.NFT(
+            encoder=[enc1], decoder=[dec1], require_input_adapter=True, **nft_args
+        )
         self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT
 
         print(f"""Work will be saved at {self.writerlocation}""")
+
+    def create_masks(self, model_args, layer=0):
+        matsize = model_args["dim_m"]
+        if layer == 0:
+            mask = torch.ones(matsize, matsize, requires_grad=False)
+        else:
+            blocksize = matsize // 2
+            block = torch.ones(blocksize, blocksize, requires_grad=False)
+            mask = torch.block_diag(block, block)
+        return mask
 
     def train(self):
         self.nftmodel.train().to(dtype=self.dtype).to(self.device)

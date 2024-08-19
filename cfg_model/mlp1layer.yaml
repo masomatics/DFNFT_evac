@@ -15,6 +15,7 @@ modelargs:
   predictive: True
   transition_model: LS
   activation: tanh
+  no_mask: True
 
 nftmodel: 
   fn: ./module/ft_decimation
