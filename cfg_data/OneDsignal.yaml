@@ -2,7 +2,7 @@
   name: Shifted_FreqFun_nl
   args:
     Ndata: 30000
-    N: 128
+    num_sample_points: 128
     T: 3
     max_T: 9
     shift_label: False

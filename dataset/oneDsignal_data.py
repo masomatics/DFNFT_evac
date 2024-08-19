@@ -17,7 +17,7 @@ class Shifted_FreqFun:
     def __init__(
         self,
         Ndata=5000,  # Number of data
-        N=128,  # Number of observation points
+        num_sample_points=128,  # Number of observation points
         T=3,  # Time steps in a sequence
         shift_label=False,
         indexing=False,
@@ -43,7 +43,7 @@ class Shifted_FreqFun:
         self.T = T
         self.max_T = max_T
         self.Ndata = Ndata
-        self.N = N
+        self.num_sample_points = num_sample_points
         self.ns = ns
         self.rng = rng if rng is not None else np.random
         self.nfreq = nfreq
@@ -69,8 +69,8 @@ class Shifted_FreqFun:
         self.coef = coef
         self.coefs = []
 
-        dt = 1.0 / N
-        t = np.arange(0, N * dt, dt)  # time domain
+        dt = 1.0 / num_sample_points
+        t = np.arange(0, num_sample_points * dt, dt)  # time domain
 
         if freq_fix == True:
             if len(freq_manual) > 0:
@@ -78,7 +78,7 @@ class Shifted_FreqFun:
             else:
                 np.random.seed(freqseed)
                 self.freqsel = np.random.randint(
-                    0, np.ceil(N / (5 * self.shift_range)), nfreq
+                    0, np.ceil(num_sample_points / (5 * self.shift_range)), nfreq
                 )
             print(self.freqsel)
         else:
@@ -103,7 +103,7 @@ class Shifted_FreqFun:
                 self.coefs.append(coef)
             else:
                 freqsel = np.random.randint(
-                    0, np.ceil(N / (5 * self.shift_range)), nfreq
+                    0, np.ceil(num_sample_points / (5 * self.shift_range)), nfreq
                 )  # randomly selected frequencies
                 coef = self.coef
 
@@ -162,7 +162,7 @@ class Shifted_FreqFun:
         fvals = []
         for t in range(self.T):
             sft_idx = int(
-                np.floor(t * shift * self.N / (2 * math.pi))
+                np.floor(t * shift * self.num_sample_points / (2 * math.pi))
             )  # time point corresponding to shift
             fn_t = np.roll(fun, sft_idx)  # fn_t(i) = f(i-sft_idx)  (mod N)
             fvals.append(
@@ -186,7 +186,7 @@ class Shifted_FreqFun_nl:
     def __init__(
         self,
         Ndata=5000,  # Number of data
-        N=128,  # Number of observation points
+        num_sample_points=128,  # Number of observation points
         T=3,  # Time steps in a sequence
         shift_label=False,
         batchM_size=1,
@@ -211,7 +211,7 @@ class Shifted_FreqFun_nl:
         self.T = T
         self.max_T = max_T
         self.Ndata = Ndata
-        self.N = N
+        self.num_sample_points = num_sample_points
         self.ns = ns
         self.rng = rng if rng is not None else np.random
         self.nfreq = nfreq + smallfreqs_num
@@ -241,7 +241,7 @@ class Shifted_FreqFun_nl:
             else:
                 np.random.seed(freqseed)
                 self.freqsel = np.random.randint(
-                    0, np.ceil(N / (5 * self.shift_range)), self.nfreq
+                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.nfreq
                 )
             print(self.freqsel)
         else:
@@ -274,7 +274,7 @@ class Shifted_FreqFun_nl:
 
             else:
                 freqsel = np.random.randint(
-                    0, np.ceil(N / (5 * self.shift_range)), self.nfreq
+                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.nfreq
                 )  # randomly selected frequencies
                 freqs.append(freqsel)
                 coefs.append(self.coef)
@@ -315,8 +315,8 @@ class Shifted_FreqFun_nl:
 
     def __getitem__(self, i):  # i-th data and its shifts (T shifts)
         freq = self.freqs[i, :]
-        dt = 1.0 / self.N
-        obs_t = np.arange(0, self.N * dt, dt)  # observed time  [0,1]/N
+        dt = 1.0 / self.num_sample_points
+        obs_t = np.arange(0, self.num_sample_points * dt, dt)  # observed time  [0,1]/N
         lat_t = np.power(obs_t, self.pow)  # observed time domain: lat_t = obs_t^pow
 
         if self.shift_label:
