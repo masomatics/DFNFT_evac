@@ -25,11 +25,12 @@ class NFT(nn.Module):
     ):
         super().__init__()
         self.is_Dimside = is_Dimside
-        self.require_input_adapter = require_input_adapter
-        self.encoder = encoder
-        self.encoder.require_input_adapter = self.require_input_adapter
-        self.decoder = decoder
-        self.decoder.require_input_adapter = self.require_input_adapter
+        if encoder is not None:
+            self.require_input_adapter = require_input_adapter
+            self.encoder = encoder
+            self.encoder.require_input_adapter = self.require_input_adapter
+            self.decoder = decoder
+            self.decoder.require_input_adapter = self.require_input_adapter
 
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
@@ -215,8 +216,6 @@ class DFNFT(NFT):
         infer_pred = latent_preds[-1]
         intermediate_pred = latent_preds[-1]
         for j in range(self.depth - 1, -1, -1):
-            infer_pred = self.owndecoders[j]
-            print(j)
+            infer_pred = self.owndecoders[j](infer_pred)
 
-        pdb.set_trace()
         return infer_pred

@@ -20,7 +20,7 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mask1Stacklayer"
+    modelname = "mask1layer"
     # modelname = "fordebug"
     datname = "OneDsignal_c8mimic"
     # datname = "OneDCyclic"
@@ -148,9 +148,8 @@ class DF_Trainer(object):
                 **nft_args,
             )
             nftmodels.append(nftmodel)
-
-        if "nftlayer" in model_args.keys():
-            self.nftmodel = dfnft_class(nftlist=nftmodels, owndecs=decstars)
+        if "nftlayer" in nft_args.keys():
+            self.nftmodel = dfnft_class(nftlist=nftmodels, owndecoders=decstars)
         else:
             self.nftmodel = nftmodel
 
