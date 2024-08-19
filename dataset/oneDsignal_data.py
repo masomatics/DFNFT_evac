@@ -67,7 +67,7 @@ class Shifted_FreqFun:
         dt = 1.0 / num_sample_points
         t = np.arange(0, num_sample_points * dt, dt)  # time domain
 
-        if freq_fix == True:
+        if freq_fix:
             if len(freq_manual) > 0:
                 self.freqsel = freq_manual
             else:
@@ -86,7 +86,7 @@ class Shifted_FreqFun:
 
         for i in range(Ndata):
             # Initial function data generated: f(t) = \sum_j coef_j * sin( 2 \pi freqsel_j t)
-            if freq_fix == True:
+            if freq_fix:
                 freqsel = self.freqsel
                 coef = np.random.randn(nfreq)
                 coef = coef / np.linalg.norm(coef)
@@ -228,7 +228,7 @@ class Shifted_FreqFun_nl:
             # coef = coef/nfreq
         self.coef = coef
 
-        if freq_fix == True:
+        if freq_fix:
             if len(freq_manual) > 0:
                 self.freqsel = freq_manual
             else:
@@ -255,7 +255,7 @@ class Shifted_FreqFun_nl:
         print(test)
 
         for i in range(Ndata):
-            if freq_fix == True:
+            if freq_fix:
                 coef = np.random.randn(self.nfreq)
                 coef = coef / np.linalg.norm(coef)
                 if self.smallfreqs_num > 0:
