@@ -57,13 +57,13 @@ class DF_Trainer(object):
         self.configs = configs
         self.dtype = torch.float64
 
-        self.writerlocation = "./dnftresult/vanillaX"
+        self.writer_location = "./dnftresult/vanillaX"
         self._set_train()
         self._set_models()
         self._set_data()
         self._set_loader()
         self._set_optimizer()
-        self.writer = SummaryWriter(self.writerlocation)
+        self.writer = SummaryWriter(self.writer_location)
 
         print(f"""Using device {self.device}""")
 
@@ -140,10 +140,10 @@ class DF_Trainer(object):
             owndecs=owndecs,
             **nft_args,
         )
-        self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
+        self.writer_location = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT
 
-        print(f"""Work will be saved at {self.writerlocation}""")
+        print(f"""Work will be saved at {self.writer_location}""")
 
     def create_masks(self, model_args, layer=0):
         matsize = model_args["dim_m"]
@@ -195,13 +195,13 @@ class DF_Trainer(object):
             if self.iter % self.save_freq == 0:
                 print(loss_metrics["all_loss"])
                 try:
-                    torch.save(self.nftmodel, f"{self.writerlocation}/model.pt")
+                    torch.save(self.nftmodel, f"{self.writer_location}/model.pt")
                 except Exception:
                     print("torch.nn.utils.parametrize is probably invoked.")
                     torch.save(
-                        self.nftmodel.state_dict(), f"{self.writerlocation}/model.pt"
+                        self.nftmodel.state_dict(), f"{self.writer_location}/model.pt"
                     )
-                print(f"Model saved at {self.writerlocation}/model.pt")
+                print(f"Model saved at {self.writer_location}/model.pt")
                 self.evaluate()
                 print("Model evaluated")
 
