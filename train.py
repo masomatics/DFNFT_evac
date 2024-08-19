@@ -57,8 +57,8 @@ class Trainer:
 
         self.writer_location = "./dnftresult/vanillaX"
         self._set_train()
-        self._set_models()
         self._set_data()
+        self._set_models()
         self._set_loader()
         self._set_optimizer()
         self.writer = SummaryWriter(self.writer_location)
@@ -66,17 +66,18 @@ class Trainer:
         print(f"Using device {self.device}")
 
     def _set_train(self):
-        for attr in self.configs["train"].keys():
+        for attr in self.configs["train"]:
             setattr(self, attr, self.configs["train"][attr])
 
     def _set_data(self):
         data_args = self.configs["data"]
-        # self.data = SequentialMNIST_double(**data_args)
         self.data = yu.load_component(data_args)
         print(f"Using the datatype {self.data}")
         eval_data_args = copy.deepcopy(data_args)
         eval_data_args["args"]["num_shifts"] = self.evalT
         self.eval_data = yu.load_component(eval_data_args)
+
+        self.configs["model"]["dim_data"] = self.data.num_sample_points
 
     def _set_loader(self):
         torch.manual_seed(self.seed)
