@@ -21,8 +21,8 @@ from misc import yaml_util as yu
 def main():
     # modename
     modelname = "fordebug"
-    datname = "OneDsignal"
-    # datname = "OneDCyclic"
+    # datname = "OneDsignal"
+    datname = "OneDCyclic"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
 
