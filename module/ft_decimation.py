@@ -88,6 +88,28 @@ class NFT(nn.Module):
         # print(latent[0, 0, :5], "ForDebug LAT")
         # print(latent[0, 1, :5], "ForDebug LAT")
 
+        latent_preds = self.shift_latent(latent, n_rolls=n_rolls)
+        # determine the regressor on H0, H1
+        # self.dynamics._compute_M(latent[:, :2])
+        # # print(self.dynamics.M[0, 0], "FOR Debug M")
+        # latent_preds = [latent[:, [0]], latent[:, [1]]]
+        # terminal_latent = latent[:, [1]]  # H1
+
+        # for k in range(n_rolls - 1):
+        #     shifted_latent = self.dynamics(terminal_latent)  # H1+k
+        #     terminal_latent = shifted_latent
+        #     latent_preds.append(shifted_latent)
+        # latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
+        # print(f""" {latent_preds[0,0,0]}, Debug Latent Pred0""")
+        # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
+        # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
+
+        predicted = self.do_decode(latent_preds, batchsize=batchsize)  # X0, X1, X2, ...
+        # print(predicted[0, -1, :5], "Debug XPred")
+
+        return predicted
+
+    def shift_latent(self, latent, n_rolls=1):
         # determine the regressor on H0, H1
         self.dynamics._compute_M(latent[:, :2])
         # print(self.dynamics.M[0, 0], "FOR Debug M")
@@ -99,14 +121,7 @@ class NFT(nn.Module):
             terminal_latent = shifted_latent
             latent_preds.append(shifted_latent)
         latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
-        # print(f""" {latent_preds[0,0,0]}, Debug Latent Pred0""")
-        # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
-        # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
-
-        predicted = self.do_decode(latent_preds, batchsize=batchsize)  # X0, X1, X2, ...
-        # print(predicted[0, -1, :5], "Debug XPred")
-
-        return predicted
+        return latent_preds
 
     def loss(self, obstuple, n_rolls=1):
         predinput = obstuple[:, :-1]  # X0 X1

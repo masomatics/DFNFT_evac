@@ -20,8 +20,9 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mlp1layer_nonDim"
+    modelname = "fordebug"
     datname = "OneDsignal"
+    # datname = "OneDCyclic"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
 
