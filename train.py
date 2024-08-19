@@ -18,7 +18,7 @@ from module.ft_decimation import NFT
 
 def main():
     model_name = "fordebug"
-    data_name = "one_dim_signal"
+    data_name = "one_dim_cyclic"
     train_name = "baseline"
     exp_name = f"{data_name}_{model_name}_{train_name}"
 
@@ -77,8 +77,6 @@ class Trainer:
         eval_data_args["args"]["num_shifts"] = self.evalT
         self.eval_data = yu.load_component(eval_data_args)
 
-        self.configs["model"]["dim_data"] = self.data.num_sample_points
-
     def _set_loader(self):
         torch.manual_seed(self.seed)
 
@@ -117,6 +115,7 @@ class Trainer:
         nft_class = yu.load_component_fxn(cfg_model["nftmodel"])
 
         model_args = cfg_model["modelargs"]
+        model_args["dim_data"] = self.data.num_sample_points
         nft_args = cfg_model["nftargs"]
         mask = self.create_masks(model_args)
 

@@ -15,7 +15,7 @@ class CyclicGroupSignal(Dataset):
         num_shifts: int = 3,
         num_freqs: int = 5,
         diffeo_of_circle: Callable[[float], float] = lambda t: t**3,
-        group_param: tuple[int, int] = (2, 5),
+        group_param: tuple[int, int] = (2, 11),
         shift_label: bool = False,
     ) -> None:
         self.num_data = num_data
