@@ -152,7 +152,8 @@ class NFT(nn.Module):
         b, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
-        predicted = self(initialpair, n_rolls=rolllength).detach()
+        predicted, _, _ = self(initialpair, n_rolls=rolllength)
+        predicted = predicted.detach()
         print("""!!! Visualization Rendered!!! """)
         self.visualize(evalseq, predicted, writer)
 
@@ -199,14 +200,16 @@ class DFNFT(NFT):
         obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
-    def intermediate_decode(self, latent, layer_idx_from_bottom=0):
-        batchsize = latent.shape[0]
-        latent = rearrange(latent, "n t ... -> (n t) ...")
-        for j in range(layer_idx_from_bottom, self.depth):
-            loc = self.depth - (j + 1)
-            latent = self.nftlayers[loc].do_decode(latent)
-        obshat = latent
-        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
+    def intermediate_decode(self, kth_latent, layer_idx_from_bottom=0):
+        batchsize = kth_latent.shape[0]
+        kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
+        kplus1th_latent = self.nftlayers[self.depth - layer_idx_from_bottom].do_decode(
+            kth_latent
+        )
+        kplus1th_latent = rearrange(
+            kplus1th_latent, "(n t) ... -> n t ...", n=batchsize
+        )
+        return kplus1th_latent
 
     def __call__(self, obs, n_rolls=1):
         batchsize, t = obs.shape[0], obs.shape[1]
@@ -221,6 +224,51 @@ class DFNFT(NFT):
             latent_pred = self.nftlayers[k].shift_latent(latent, n_rolls=n_rolls)
             latent_preds.append(latent_pred)
 
+        intermediate_preds = []
+        for k in range(1, self.depth):
+            kplus1latent_pred = self.intermediate_decode(
+                latent_preds[k], layer_idx_from_bottom=k
+            )
+            intermediate_preds.append(kplus1latent_pred)
+
         infer_pred = self.do_decode(latent_preds[-1])
 
-        return infer_pred
+        return infer_pred, latent_preds, intermediate_preds
+
+    def lossfxn(self, target, pred):
+        errval = torch.mean(
+            torch.sum((target - pred) ** 2, axis=tuple(range(2, target.ndim)))
+        )
+        return errval
+
+    def loss(self, obstuple, n_rolls=1):
+        predinput = obstuple[:, :-1]  # X0 X1
+
+        # With the understanding that Z0 = Phi_0(X), Z^{-1} = X,
+        # Xhat(t+1),   [Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth}(t+1)] ,
+        # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
+        predfuture, latent_preds, intermediate_preds = self(predinput, n_rolls)
+
+        # [X, Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth-1}(t+1)] to be compared against
+        # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
+        targets = [obstuple] + latent_preds[:-1]
+
+        targets = []
+        intermediate_loss = 0
+        for k in range(self.depth):
+            if k == self.depth - 1:
+                predloss = self.lossfxn(obstuple, predfuture)
+            else:
+                intermediate_loss = intermediate_loss + self.lossfxn(
+                    targets[k], intermediate_preds[k]
+                )
+
+        # predloss = dyn._mse(
+        #     obstuple[:, 1:], predfuture[:, 1:]
+        # )  # d([X1hat, X1], [X2hat, X2])
+
+        loss = {"all_loss": predloss}
+        loss["intermediate"] = torch.tensor([0.0])
+        loss["predloss"] = predloss
+
+        return loss

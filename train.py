@@ -129,12 +129,15 @@ class DF_Trainer(object):
             dfnft_class = nft_class
             nft_class = yu.load_component_fxn(nft_args["nftlayer"])
 
-        mask = self.create_masks(model_args)
-
         owndecs = []
         decstars = []
         nftmodels = []
         for k in range(nft_args["depth"]):
+            if nft_args["depth"] == 1:
+                mask = self.create_masks(model_args, layer=k)
+            else:
+                mask = self.create_masks(model_args, layer=k + 1)
+            pdb.set_trace()
             enc1 = enc_class(**model_args, maskmat=mask)
             dec1 = dec_class(**model_args, maskmat=mask)
             decStar = dec_class(**model_args, maskmat=mask)
