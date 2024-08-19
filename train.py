@@ -12,25 +12,22 @@ from tqdm import tqdm
 import copy
 import numpy as np
 
-from module import ft_decimation as ftd
-import pdb
 from misc import yaml_util as yu
-# from module import ft_module_from_dimside as ftdim
 
 
 def main():
     # modename
-    modelname = "fordebug"
+    model_name = "fordebug"
     # datname = "OneDsignal"
-    datname = "OneDCyclic"
-    trainname = "baseline"
-    mode = "_".join([datname, modelname, trainname])
+    data_name = "OneDCyclic"
+    train_name = "baseline"
+    exp_name = f"{data_name}_{model_name}_{train_name}"
 
-    with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
+    with open(f"""./cfg_model/{model_name}.yaml""", "rb") as f:
         cfg_model = yaml.safe_load(f)
-    with open(f"""./cfg_data/{datname}.yaml""", "rb") as f:
+    with open(f"""./cfg_data/{data_name}.yaml""", "rb") as f:
         cfg_data = yaml.safe_load(f)
-    with open(f"""./cfg_train/{trainname}.yaml""", "rb") as f:
+    with open(f"""./cfg_train/{train_name}.yaml""", "rb") as f:
         cfg_train = yaml.safe_load(f)
 
     myseed = cfg_train["seed"]
@@ -40,7 +37,7 @@ def main():
     configs["train"] = cfg_train
     configs["model"] = cfg_model
     configs["data"] = cfg_data
-    configs["expname"] = mode
+    configs["expname"] = exp_name
 
     configs["train"]["device"] = 2
 
@@ -105,7 +102,6 @@ class DF_Trainer(object):
     def create_configs(self, depth, base_args):
         cfglist = []
         for k in range(depth):
-            encdec_cfg = []
             common_cfg = copy.deepcopy(base_args)
             if k == 0:
                 common_cfg["require_input_adapter"] = True
@@ -199,19 +195,19 @@ class DF_Trainer(object):
             if self.iter % self.save_freq == 0:
                 print(loss_metrics["all_loss"])
                 try:
-                    torch.save(self.nftmodel, f"""{self.writerlocation}/model.pt""")
-                except:
+                    torch.save(self.nftmodel, f"{self.writerlocation}/model.pt")
+                except Exception:
                     print("torch.nn.utils.parametrize is probably invoked.")
                     torch.save(
                         self.nftmodel.state_dict(), f"{self.writerlocation}/model.pt"
                     )
-                print(f"""Model saved at {self.writerlocation}/model.pt""")
+                print(f"Model saved at {self.writerlocation}/model.pt")
                 self.evaluate()
-                print(f"""Model evaluated""")
+                print("Model evaluated")
 
     def evaluate(self):
         self.nftmodel = self.nftmodel.eval()
-        evalseq, label = self.eval_data[1]
+        evalseq, _ = self.eval_data[1]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
         self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
         self.nftmodel = self.nftmodel.train()
