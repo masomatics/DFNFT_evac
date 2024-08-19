@@ -132,17 +132,17 @@ class NFT(nn.Module):
         # print(predfuture[0, 1:, :5])
         # pdb.set_trace()
 
-        predloss = torch.mean(
+        pred_loss = torch.mean(
             torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
         )
 
-        # predloss = dyn._mse(
+        # pred_loss = dyn._mse(
         #     obstuple[:, 1:], predfuture[:, 1:]
         # )  # d([X1hat, X1], [X2hat, X2])
 
-        loss = {"all_loss": predloss}
-        loss["intermediate"] = torch.tensor([0.0])
-        loss["predloss"] = predloss
+        loss = {"all_loss": pred_loss}
+        loss["intermediate_loss"] = torch.tensor([0.0])
+        loss["pred_loss"] = pred_loss
 
         return loss
 

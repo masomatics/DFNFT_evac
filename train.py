@@ -1,4 +1,3 @@
-import os
 import sys
 import random
 from itertools import cycle
@@ -158,14 +157,8 @@ class Trainer:
         loader_iter = cycle(self.loader)
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
-            [seqs, label] = next(loader_iter)
+            seqs, _ = next(loader_iter)
             seqs = seqs.to(dtype=self.dtype).to(self.device)
-            # print(f"""Debug label is {label}""")
-            # print(seqs[0, 0, :10])
-            # print(seqs[0, 1, :10])
-
-            # print(self.nftmodel.encoder.enc.lin1.bias[:10])
-            # seqs:   N T instance_shape
             n, t = seqs.shape[:2]
             trainT = self.trainT
             trainseqs = seqs[:, :trainT]
@@ -174,17 +167,17 @@ class Trainer:
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
 
-            loss["predloss"].backward()
+            loss["pred_loss"].backward()
             self.optimizer.step()
 
             all_loss = loss["all_loss"].item()
-            intermediate = loss["intermediate"].item()
-            predloss = loss["predloss"].item()
+            intermediate_loss = loss["intermediate_loss"].item()
+            pred_loss = loss["pred_loss"].item()
 
             loss_metrics = {
                 "all_loss": all_loss,
-                "predloss": predloss,
-                "intermediate": intermediate,
+                "pred_loss": pred_loss,
+                "intermediate_loss": intermediate_loss,
             }
 
             for key in loss_metrics.keys():
