@@ -16,6 +16,7 @@ class CyclicGroupSignal(Dataset):
         num_freqs: int = 5,
         diffeo_of_circle: Callable[[float], float] = lambda t: t**3,
         group_param: tuple[int, int] = (2, 5),
+        shift_label: bool = False,
     ) -> None:
         self.num_data = num_data
         self.num_shifts = T
@@ -25,6 +26,7 @@ class CyclicGroupSignal(Dataset):
 
         self.num_sample_points = max(self.group_order * 10, 128)
 
+        self.shift_label = shift_label
         random.seed(0)
         np.random.seed(0)
 
@@ -80,7 +82,9 @@ class CyclicGroupSignal(Dataset):
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
             shifted_signals.append(torch.from_numpy(signal))
 
-        return torch.stack(shifted_signals), coeffs  # (num_shifts, N)
+        return torch.stack(
+            shifted_signals
+        ), g_action * math.pi * 2 if self.shift_label else torch.stack(shifted_signals)
 
 
 if __name__ == "__main__":
