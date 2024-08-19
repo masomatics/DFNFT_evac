@@ -1,7 +1,6 @@
 import torch
-from einops import rearrange, repeat, einsum
+from einops import repeat, einsum
 from misc import orthog_proj as op
-import pdb
 
 
 def _rep_M(M, T):

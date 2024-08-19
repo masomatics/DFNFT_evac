@@ -2,8 +2,6 @@
 # https://github.com/vsitzmann/neural-isometries/blob/main/nn/fmaps.py
 
 import torch
-import numpy as np
-import pdb
 
 
 def ortho_det(U):

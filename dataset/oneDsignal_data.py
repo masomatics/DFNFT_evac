@@ -3,13 +3,10 @@
 # shift is acted to a function
 # Modified from seq_mnist.py
 
-import os
 import numpy as np
 import math
-from copy import deepcopy
 import pdb
 import torch
-from einops import rearrange
 
 
 class Shifted_FreqFun:

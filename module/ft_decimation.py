@@ -7,9 +7,7 @@ from torch import nn
 
 from matplotlib import pyplot as plt
 
-from einops import rearrange, repeat, einsum
-from misc import orthog_proj as op
-import pdb
+from einops import rearrange
 from module import dynamics as dyn
 
 

@@ -1,9 +1,5 @@
-import numpy as np
 import torch
 from torch import nn
-from einops.layers.torch import Rearrange
-from einops import repeat, rearrange
-import pdb
 
 
 # Four layer MLP for encoder
