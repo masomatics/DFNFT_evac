@@ -16,18 +16,17 @@ from misc import yaml_util as yu
 
 
 def main():
-    # modename
     model_name = "fordebug"
-    # datname = "OneDsignal"
-    data_name = "OneDCyclic"
+    data_name = "OneDsignal"
+    # data_name = "OneDCyclic"
     train_name = "baseline"
     exp_name = f"{data_name}_{model_name}_{train_name}"
 
-    with open(f"""./cfg_model/{model_name}.yaml""", "rb") as f:
+    with open(f"./cfg_model/{model_name}.yaml", "rb") as f:
         cfg_model = yaml.safe_load(f)
-    with open(f"""./cfg_data/{data_name}.yaml""", "rb") as f:
+    with open(f"./cfg_data/{data_name}.yaml", "rb") as f:
         cfg_data = yaml.safe_load(f)
-    with open(f"""./cfg_train/{train_name}.yaml""", "rb") as f:
+    with open(f"./cfg_train/{train_name}.yaml", "rb") as f:
         cfg_train = yaml.safe_load(f)
 
     myseed = cfg_train["seed"]
@@ -41,18 +40,17 @@ def main():
 
     configs["train"]["device"] = 2
 
-    trainer = DF_Trainer(configs)
+    trainer = Trainer(configs)
     trainer.train()
 
 
-class DF_Trainer(object):
+class Trainer:
     def __init__(self, configs):
-        seed = 1
-        self.seed = seed
+        self.seed = 1
         torch.cuda.empty_cache()
-        torch.manual_seed(seed)
-        random.seed(seed)
-        np.random.seed(seed)
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
 
         self.configs = configs
         self.dtype = torch.float64
@@ -65,7 +63,7 @@ class DF_Trainer(object):
         self._set_optimizer()
         self.writer = SummaryWriter(self.writer_location)
 
-        print(f"""Using device {self.device}""")
+        print(f"Using device {self.device}")
 
     def _set_train(self):
         for attr in self.configs["train"].keys():
@@ -75,7 +73,7 @@ class DF_Trainer(object):
         data_args = self.configs["data"]
         # self.data = SequentialMNIST_double(**data_args)
         self.data = yu.load_component(data_args)
-        print(f"""Using the datatype {self.data} """)
+        print(f"Using the datatype {self.data}")
         eval_data_args = copy.deepcopy(data_args)
         eval_data_args["args"]["T"] = self.evalT
         self.eval_data = yu.load_component(eval_data_args)
@@ -85,7 +83,7 @@ class DF_Trainer(object):
 
         self.loader = DataLoader(
             self.data,
-            batch_size=self.configs["train"]["batchsize"],
+            batch_size=self.configs["train"]["batch_size"],
             shuffle=True,
             num_workers=2,
         )
