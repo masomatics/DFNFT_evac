@@ -13,7 +13,7 @@ import numpy as np
 
 from misc import yaml_util as yu
 
-from module.ft_decimation import DFNFT
+from module.ft_decimation import NFT
 
 
 def main():
@@ -132,7 +132,7 @@ class Trainer:
             decs.append(dec1)
             decstars.append(decStar)
 
-        self.nftmodel: DFNFT = nft_class(
+        self.nftmodel: NFT = nft_class(
             encoder=encs,
             decoder=decs,
             require_input_adapter=True,

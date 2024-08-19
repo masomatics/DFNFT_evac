@@ -32,7 +32,7 @@ class NFT(nn.Module):
         self.decoder = decoder[0]
         self.decoder.require_input_adapter = self.require_input_adapter
 
-        if self.is_Dimside == True:
+        if self.is_Dimside:
             self.dynamics = dyn.DynamicsDimSide()
         else:
             self.dynamics = dyn.Dynamics()
@@ -60,11 +60,10 @@ class NFT(nn.Module):
         if is_reshaped:
             obs_nt = obs  # Already in (b,t) format
         else:
-            b, t = obs.shape[0], obs.shape[1]
+            b, _ = obs.shape[0], obs.shape[1]
             obs_nt = rearrange(obs, "b t ... -> (b t) ...")
 
         latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
-        bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
         return latent
 
@@ -145,13 +144,13 @@ class NFT(nn.Module):
         return loss
 
     def autoencode(self, obs):
-        batch_size, t = obs.shape[0], obs.shape[1]
+        batch_size, _ = obs.shape[0], obs.shape[1]
         latent = self.do_encode(obs)  # b t n a
         pred = self.do_decode(latent, batch_size=batch_size)
         return pred
 
     def evaluate(self, evalseq, writer, device):
-        b, t = evalseq.shape[0], evalseq.shape[1]
+        _, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
@@ -180,7 +179,7 @@ class DFNFT(NFT):
 
         # Turning on the input_adapter for the first layer of NFT
         self.owndecoders.require_input_adapter = True
-        assert self.nftlayers[0].require_input_adapter == True
+        assert self.nftlayers[0].require_input_adapte
 
     def do_encode(self, obs):
         latent = obs

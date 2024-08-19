@@ -27,8 +27,8 @@ class Rotmat(nn.Module):
         angle = theta * freq
         return torch.tensor(
             [
-                [np.cos(freq * theta), -np.sin(freq * theta)],
-                [np.sin(freq * theta), np.cos(freq * theta)],
+                [np.cos(angle), -np.sin(angle)],
+                [np.sin(angle), np.cos(angle)],
             ]
         )
 
