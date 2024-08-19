@@ -80,7 +80,7 @@ class CyclicGroupSignal(Dataset):
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
             shifted_signals.append(torch.from_numpy(signal))
 
-        return torch.stack(shifted_signals)  # (num_shifts, N)
+        return torch.stack(shifted_signals), g  # (num_shifts, N)
 
 
 if __name__ == "__main__":
