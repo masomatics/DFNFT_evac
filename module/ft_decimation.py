@@ -199,13 +199,21 @@ class DFNFT(NFT):
         obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
+    def intermediate_decode(self, latent, layer_idx_from_bottom=0):
+        batchsize = latent.shape[0]
+        latent = rearrange(latent, "n t ... -> (n t) ...")
+        for j in range(layer_idx_from_bottom, self.depth):
+            loc = self.depth - (j + 1)
+            latent = self.nftlayers[loc].do_decode(latent)
+        obshat = latent
+        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
+
     def __call__(self, obs, n_rolls=1):
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
         latents = self.do_encode(obs)  # b t n a
         # print(latent[0, 0, :5], "ForDebug LAT")
         # print(latent[0, 1, :5], "ForDebug LAT")
-
         latent_preds = []
         for k in range(self.depth):
             # determine the regressor on H0, H1
@@ -213,9 +221,6 @@ class DFNFT(NFT):
             latent_pred = self.nftlayers[k].shift_latent(latent, n_rolls=n_rolls)
             latent_preds.append(latent_pred)
 
-        infer_pred = latent_preds[-1]
-        intermediate_pred = latent_preds[-1]
-        for j in range(self.depth - 1, -1, -1):
-            infer_pred = self.owndecoders[j](infer_pred)
+        infer_pred = self.do_decode(latent_preds[-1])
 
         return infer_pred

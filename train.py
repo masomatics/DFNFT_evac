@@ -20,7 +20,7 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mask1layer"
+    modelname = "mask1Stacklayer"
     # modelname = "fordebug"
     datname = "OneDsignal_c8mimic"
     # datname = "OneDCyclic"
