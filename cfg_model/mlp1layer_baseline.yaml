@@ -1,27 +1,27 @@
 #root: /tmp/datasets/MNIST
 encmodel:
-  fn: ./module/mlp_new
+  fn: ./module/mlp
   name: MLPEncoder
 
 decmodel:
-  fn: ./module/mlp_new
+  fn: ./module/mlp
   name: MLPDecoder
 
 modelargs:
   dim_data: 128
-  dim_m: 10
-  dim_a: 16
+  dim_m: 16
+  dim_a: 10
   depth: 3
-  hidden_dim: 260
   predictive: True
   transition_model: LS
   activation: tanh
+  no_mask: True
 
 nftmodel: 
   fn: ./module/ft_decimation
   name: NFT
 
 nftargs:
-  orth_proj: False
+  orth_proj: True
   depth: 1
-  is_Dimside: False
+  is_Dimside: True

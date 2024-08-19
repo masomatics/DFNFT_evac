@@ -12,16 +12,16 @@ modelargs:
   dim_m: 10
   dim_a: 16
   depth: 3
-  hidden_dim: 260
   predictive: True
   transition_model: LS
   activation: tanh
+  no_mask: True
 
 nftmodel: 
   fn: ./module/ft_decimation
   name: NFT
 
 nftargs:
-  orth_proj: False
+  orth_proj: True
   depth: 1
   is_Dimside: False

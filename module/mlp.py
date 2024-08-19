@@ -82,6 +82,7 @@ class MLP_AE(nn.Module):
         activation="tanh",
         require_input_adapter=False,
         maskmat=None,
+        no_mask=True,
     ):
         super().__init__()
         self.dim_a = dim_a
