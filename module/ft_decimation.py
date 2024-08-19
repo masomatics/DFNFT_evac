@@ -7,9 +7,7 @@ from torch import nn
 
 from matplotlib import pyplot as plt
 
-from einops import rearrange, repeat, einsum
-from misc import orthog_proj as op
-import pdb
+from einops import rearrange
 from module import dynamics as dyn
 
 
@@ -34,7 +32,7 @@ class NFT(nn.Module):
         self.decoder = decoder[0]
         self.decoder.require_input_adapter = self.require_input_adapter
 
-        if self.is_Dimside == True:
+        if self.is_Dimside:
             self.dynamics = dyn.DynamicsDimSide()
         else:
             self.dynamics = dyn.Dynamics()
@@ -57,32 +55,31 @@ class NFT(nn.Module):
         return latent_preds
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
-    def do_encode(self, obs, embed=None, is_reshaped=False):
+    def do_encode(self, obs, is_reshaped=False):
         # expect   N T C H W
         if is_reshaped:
             obs_nt = obs  # Already in (b,t) format
         else:
-            b, t = obs.shape[0], obs.shape[1]
+            b, _ = obs.shape[0], obs.shape[1]
             obs_nt = rearrange(obs, "b t ... -> (b t) ...")
 
         latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
-        bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
         return latent
 
-    def do_decode(self, latent, batchsize, do_reshape=True):
+    def do_decode(self, latent, batch_size, do_reshape=True):
         # expect input N T dim
         latent = rearrange(latent, "n t ... -> (n t) ...")
 
         obshat_batched = self.decoder(latent)  # (N T) obshape
         if do_reshape:
-            obshat = rearrange(obshat_batched, "(n t) ... -> n t ...", n=batchsize)
+            obshat = rearrange(obshat_batched, "(n t) ... -> n t ...", n=batch_size)
         else:
             obshat = obshat_batched
         return obshat
 
     def __call__(self, obs, n_rolls=1):
-        batchsize, t = obs.shape[0], obs.shape[1]
+        batch_size, t = obs.shape[0], obs.shape[1]
         assert t > 1
         latent = self.do_encode(obs)  # b t n a
         # print(latent[0, 0, :5], "ForDebug LAT")
@@ -104,7 +101,9 @@ class NFT(nn.Module):
         # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
         # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
 
-        predicted = self.do_decode(latent_preds, batchsize=batchsize)  # X0, X1, X2, ...
+        predicted = self.do_decode(
+            latent_preds, batch_size=batch_size
+        )  # X0, X1, X2, ...
         # print(predicted[0, -1, :5], "Debug XPred")
 
         return predicted
@@ -130,28 +129,28 @@ class NFT(nn.Module):
         # print(predfuture[0, 1:, :5])
         # pdb.set_trace()
 
-        predloss = torch.mean(
+        pred_loss = torch.mean(
             torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
         )
 
-        # predloss = dyn._mse(
+        # pred_loss = dyn._mse(
         #     obstuple[:, 1:], predfuture[:, 1:]
         # )  # d([X1hat, X1], [X2hat, X2])
 
-        loss = {"all_loss": predloss}
-        loss["intermediate"] = torch.tensor([0.0])
-        loss["predloss"] = predloss
+        loss = {"all_loss": pred_loss}
+        loss["intermediate_loss"] = torch.tensor([0.0])
+        loss["pred_loss"] = pred_loss
 
         return loss
 
     def autoencode(self, obs):
-        batchsize, t = obs.shape[0], obs.shape[1]
+        batch_size, _ = obs.shape[0], obs.shape[1]
         latent = self.do_encode(obs)  # b t n a
-        pred = self.do_decode(latent, batchsize=batchsize)
+        pred = self.do_decode(latent, batch_size=batch_size)
         return pred
 
     def evaluate(self, evalseq, writer, device):
-        b, t = evalseq.shape[0], evalseq.shape[1]
+        _, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
@@ -171,16 +170,16 @@ class NFT(nn.Module):
 
 
 class DFNFT(NFT):
-    def __init__(self, nftlist: list[NFT], owndecoders: list):
+    def __init__(self, nft_list: list[NFT], own_decoders: list):
         super().__init__(encoder=None, decoder=None)
-        self.owndecoders = nn.ModuleList(owndecoders)
-        self.nftlayers = nn.ModuleList(nftlist)
+        self.own_decoders = nn.ModuleList(own_decoders)
+        self.nftlayers = nn.ModuleList(nft_list)
         self.depth = len(self.nftlayers)
-        self.terminal_dynamics = nftlist[-1].dynamics
+        self.terminal_dynamics = nft_list[-1].dynamics
 
         # Turning on the input_adapter for the first layer of NFT
-        self.owndecoders.require_input_adapter = True
-        assert self.nftlayers[0].require_input_adapter == True
+        self.own_decoders.require_input_adapter = True
+        assert self.nftlayers[0].require_input_adapte
 
     def do_encode(self, obs):
         latent = obs
@@ -192,17 +191,17 @@ class DFNFT(NFT):
 
     def do_decode(self, latent, layer_idx_from_bottom=0):
         # exepcts N T dim
-        batchsize = latent.shape[0]
+        batch_size = latent.shape[0]
         latent = rearrange(latent, "n t ... -> (n t) ...")
         for j in range(layer_idx_from_bottom, self.depth):
             loc = self.depth - (j + 1)
-            latent = self.owndecoders[loc](latent)
+            latent = self.own_decoders[loc](latent)
         obshat = latent
-        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
+        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batch_size)
         return obshat
 
     def __call__(self, obs, n_rolls=1):
-        batchsize, t = obs.shape[0], obs.shape[1]
+        batch_size, t = obs.shape[0], obs.shape[1]
         assert t > 1
         latents = self.do_encode(obs)  # b t n a
         # print(latent[0, 0, :5], "ForDebug LAT")
@@ -226,5 +225,5 @@ class DFNFT(NFT):
             # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
 
             predicted = self.do_decode(
-                latent_preds, batchsize=batchsize
+                latent_preds, batch_size=batch_size
             )  # X0, X1, X2, ...

@@ -1,9 +1,5 @@
-import numpy as np
 import torch
 from torch import nn
-from einops.layers.torch import Rearrange
-from einops import repeat, rearrange
-import pdb
 
 
 # Four layer MLP for encoder
@@ -67,7 +63,7 @@ class MLPDecBase(nn.Module):
         return x
 
 
-class MLP_AE(nn.Module):
+class MLPAE(nn.Module):
     def __init__(
         self,
         dim_a,
@@ -107,7 +103,7 @@ class MLP_AE(nn.Module):
             raise NotImplementedError
 
 
-class MLPEncoder(MLP_AE):
+class MLPEncoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.enc = MLPEncBase(
@@ -131,7 +127,7 @@ class MLPEncoder(MLP_AE):
         return H
 
 
-class MLPDecoder(MLP_AE):
+class MLPDecoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.dec = MLPDecBase(

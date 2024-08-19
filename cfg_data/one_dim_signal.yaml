@@ -1,10 +1,9 @@
-  fn: ./dataset/oneDsignal_data.py
-  name: Shifted_FreqFun_nl
+  fn: ./dataset/one_dim_signal.py
+  name: ShiftedFreqFunNonLinear
   args:
-    Ndata: 30000
-    N: 128
-    T: 3
-    max_T: 9
+    num_data: 30000
+    num_sample_points: 128
+    num_shifts: 3
     shift_label: False
     shift_range: 0.4
     batchM_size: 20

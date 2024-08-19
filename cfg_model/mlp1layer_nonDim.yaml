@@ -8,7 +8,6 @@ decmodel:
   name: MLPDecoder
 
 modelargs:
-  dim_data: 128
   dim_m: 10
   dim_a: 16
   depth: 3

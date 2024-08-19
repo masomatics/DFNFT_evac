@@ -2,7 +2,6 @@ from torch import nn
 import torch
 from einops import rearrange, einsum
 import math
-import pdb
 
 
 class MaskFlatLinear(nn.Module):
@@ -44,7 +43,7 @@ class MaskFlatLinear(nn.Module):
         return x
 
 
-class MLP_AE(nn.Module):
+class MLPAE(nn.Module):
     def __init__(
         self,
         dim_a,
@@ -90,7 +89,7 @@ class MLP_AE(nn.Module):
             raise NotImplementedError
 
 
-class MLPEncoder(MLP_AE):
+class MLPEncoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -106,7 +105,7 @@ class MLPEncoder(MLP_AE):
             dimlist[0] = self.dim_data
         dimlist[-1] = self.dim_latent
         for k in range(1, 1 + self.depth):
-            if self.no_mask == True or self.dim_m == 0:
+            if self.no_mask or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
@@ -126,13 +125,13 @@ class MLPEncoder(MLP_AE):
     def forward(self, signal):
         xs = signal
         if not self.require_input_adapter:
-            xs = rearrange(xs, "... d m -> ... (d m)")
+            xs = rearrange(xs, "... d m -> ... (d m)")           
         H = self.net(xs)
         H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
         return H
 
 
-class MLPDecoder(MLP_AE):
+class MLPDecoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         dimlist = [self.hidden_dim] * (1 + self.depth)
@@ -147,7 +146,7 @@ class MLPDecoder(MLP_AE):
         dimlist[0] = self.dim_latent
         modseq = nn.ModuleList()
         for k in range(1, 1 + self.depth):
-            if self.no_mask == True or self.dim_m == 0:
+            if self.no_mask or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(

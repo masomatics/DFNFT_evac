@@ -12,14 +12,14 @@ class CyclicGroupSignal(Dataset):
     def __init__(
         self,
         num_data: int = 5000,
-        T: int = 3,
+        num_shifts: int = 3,
         num_freqs: int = 5,
         diffeo_of_circle: Callable[[float], float] = lambda t: t**3,
-        group_param: tuple[int, int] = (2, 5),
+        group_param: tuple[int, int] = (2, 11),
         shift_label: bool = False,
     ) -> None:
         self.num_data = num_data
-        self.num_shifts = T
+        self.num_shifts = num_shifts
         self.diffeo_of_circle = diffeo_of_circle
         self.group_param = group_param
         self.group_order = self.group_param[0] * self.group_param[1]
@@ -30,7 +30,9 @@ class CyclicGroupSignal(Dataset):
         random.seed(0)
         np.random.seed(0)
 
-        self.fixed_freq = np.array(random.sample(range(self.group_order), num_freqs))
+        self.fixed_freq = np.array(
+            random.sample(range(self.group_order // 2), num_freqs)
+        )
         # (num_freq, )
         self.freqs = np.array(
             [self.fixed_freq for _ in range(self.num_data)]
@@ -77,7 +79,7 @@ class CyclicGroupSignal(Dataset):
             )
 
             signal = np.matmul(
-                np.sin(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
+                np.cos(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
                 coeffs,
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
             shifted_signals.append(torch.from_numpy(signal))
