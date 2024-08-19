@@ -20,8 +20,9 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "fordebug"
-    datname = "OneDsignal"
+    modelname = "mask1Stacklayer"
+    # modelname = "fordebug"
+    datname = "OneDsignal_c8mimic"
     # datname = "OneDCyclic"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -42,7 +43,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 2
+    configs["train"]["device"] = 1
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -123,27 +124,36 @@ class DF_Trainer(object):
 
         model_args = cfg_model["modelargs"]
         nft_args = cfg_model["nftargs"]
+
+        if "nftlayer" in nft_args.keys():
+            dfnft_class = nft_class
+            nft_class = yu.load_component_fxn(nft_args["nftlayer"])
+
         mask = self.create_masks(model_args)
 
-        encs = []
-        decs = []
         owndecs = []
         decstars = []
+        nftmodels = []
         for k in range(nft_args["depth"]):
             enc1 = enc_class(**model_args, maskmat=mask)
             dec1 = dec_class(**model_args, maskmat=mask)
             decStar = dec_class(**model_args, maskmat=mask)
-            encs.append(enc1)
-            decs.append(dec1)
             decstars.append(decStar)
 
-        self.nftmodel = nft_class(
-            encoder=encs,
-            decoder=decs,
-            require_input_adapter=True,
-            owndecs=owndecs,
-            **nft_args,
-        )
+            nftmodel = nft_class(
+                encoder=enc1,
+                decoder=dec1,
+                require_input_adapter=True,
+                owndecs=owndecs,
+                **nft_args,
+            )
+            nftmodels.append(nftmodel)
+
+        if "nftlayer" in model_args.keys():
+            self.nftmodel = dfnft_class(nftlist=nftmodels, owndecs=decstars)
+        else:
+            self.nftmodel = nftmodel
+
         self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT
 

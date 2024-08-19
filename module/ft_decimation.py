@@ -16,22 +16,19 @@ from module import dynamics as dyn
 class NFT(nn.Module):
     def __init__(
         self,
-        encoder: list,
-        decoder: list,
+        encoder: None,
+        decoder: None,
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
         **kwargs,
     ):
-        assert len(encoder) == 1
-        assert len(decoder) == 1
-
         super().__init__()
         self.is_Dimside = is_Dimside
         self.require_input_adapter = require_input_adapter
-        self.encoder = encoder[0]
+        self.encoder = encoder
         self.encoder.require_input_adapter = self.require_input_adapter
-        self.decoder = decoder[0]
+        self.decoder = decoder
         self.decoder.require_input_adapter = self.require_input_adapter
 
         if self.is_Dimside == True:
@@ -208,23 +205,18 @@ class DFNFT(NFT):
         # print(latent[0, 0, :5], "ForDebug LAT")
         # print(latent[0, 1, :5], "ForDebug LAT")
 
+        latent_preds = []
         for k in range(self.depth):
             # determine the regressor on H0, H1
             latent = latents[k]
-            self.dynamics._compute_M(latent[:, :2])
-            # print(self.dynamics.M[0, 0], "FOR Debug M")
-            latent_preds = [latent[:, [0]], latent[:, [1]]]
-            terminal_latent = latent[:, [1]]  # H1
+            latent_pred = self.nftlayers[k].shift_latent(latent, n_rolls=n_rolls)
+            latent_preds.append(latent_pred)
 
-            for k in range(n_rolls - 1):
-                shifted_latent = self.dynamics(terminal_latent)  # H1+k
-                terminal_latent = shifted_latent
-                latent_preds.append(shifted_latent)
-            latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
-            # print(f""" {latent_preds[0,0,0]}, Debug Latent Pred0""")
-            # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
-            # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
+        infer_pred = latent_preds[-1]
+        intermediate_pred = latent_preds[-1]
+        for j in range(self.depth - 1, -1, -1):
+            infer_pred = self.owndecoders[j]
+            print(j)
 
-            predicted = self.do_decode(
-                latent_preds, batchsize=batchsize
-            )  # X0, X1, X2, ...
+        pdb.set_trace()
+        return infer_pred
