@@ -9,7 +9,7 @@ Code required for Character analysis.
 """
 
 
-class Rotmat(nn.Module):
+class RotationMatrix(nn.Module):
     def __init__(self, freqs):
         super().__init__()
         self.freqs = freqs
@@ -40,7 +40,7 @@ def inner_prod(rholist, gs, maxfreq=20, bins=50):
     targfreqs = np.linspace(0, maxfreq, bins)
 
     for targfreq in tqdm(targfreqs):
-        targobj = Rotmat([targfreq])
+        targobj = RotationMatrix([targfreq])
 
         inner_prod_vals = []
         for i in range(len(gs)):

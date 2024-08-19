@@ -19,7 +19,6 @@ class NFT(nn.Module):
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
-        **kwargs,
     ):
         assert len(encoder) == 1
         assert len(decoder) == 1
@@ -55,7 +54,7 @@ class NFT(nn.Module):
         return latent_preds
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
-    def do_encode(self, obs, embed=None, is_reshaped=False):
+    def do_encode(self, obs, is_reshaped=False):
         # expect   N T C H W
         if is_reshaped:
             obs_nt = obs  # Already in (b,t) format
@@ -170,15 +169,15 @@ class NFT(nn.Module):
 
 
 class DFNFT(NFT):
-    def __init__(self, nftlist: list[NFT], owndecoders: list):
+    def __init__(self, nft_list: list[NFT], own_decoders: list):
         super().__init__(encoder=None, decoder=None)
-        self.owndecoders = nn.ModuleList(owndecoders)
-        self.nftlayers = nn.ModuleList(nftlist)
+        self.own_decoders = nn.ModuleList(own_decoders)
+        self.nftlayers = nn.ModuleList(nft_list)
         self.depth = len(self.nftlayers)
-        self.terminal_dynamics = nftlist[-1].dynamics
+        self.terminal_dynamics = nft_list[-1].dynamics
 
         # Turning on the input_adapter for the first layer of NFT
-        self.owndecoders.require_input_adapter = True
+        self.own_decoders.require_input_adapter = True
         assert self.nftlayers[0].require_input_adapte
 
     def do_encode(self, obs):
@@ -195,7 +194,7 @@ class DFNFT(NFT):
         latent = rearrange(latent, "n t ... -> (n t) ...")
         for j in range(layer_idx_from_bottom, self.depth):
             loc = self.depth - (j + 1)
-            latent = self.owndecoders[loc](latent)
+            latent = self.own_decoders[loc](latent)
         obshat = latent
         obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batch_size)
         return obshat

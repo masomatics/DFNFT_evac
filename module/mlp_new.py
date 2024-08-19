@@ -43,7 +43,7 @@ class MaskFlatLinear(nn.Module):
         return x
 
 
-class MLP_AE(nn.Module):
+class MLPAE(nn.Module):
     def __init__(
         self,
         dim_a,
@@ -89,7 +89,7 @@ class MLP_AE(nn.Module):
             raise NotImplementedError
 
 
-class MLPEncoder(MLP_AE):
+class MLPEncoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -105,7 +105,7 @@ class MLPEncoder(MLP_AE):
             dimlist[0] = self.dim_data
         dimlist[-1] = self.dim_latent
         for k in range(1, 1 + self.depth):
-            if self.no_mask == True or self.dim_m == 0:
+            if self.no_mask or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
@@ -131,7 +131,7 @@ class MLPEncoder(MLP_AE):
         return H
 
 
-class MLPDecoder(MLP_AE):
+class MLPDecoder(MLPAE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         dimlist = [self.hidden_dim] * (1 + self.depth)
@@ -146,7 +146,7 @@ class MLPDecoder(MLP_AE):
         dimlist[0] = self.dim_latent
         modseq = nn.ModuleList()
         for k in range(1, 1 + self.depth):
-            if self.no_mask == True or self.dim_m == 0:
+            if self.no_mask or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(

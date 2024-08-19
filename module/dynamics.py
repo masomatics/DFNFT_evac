@@ -42,7 +42,7 @@ def _solve(A, B, mask=None):
 
 
 # Regression and Internal Prediction Module
-class Dynamics(object):
+class Dynamics:
     def __init__(self):
         self.M = None
 
@@ -96,7 +96,7 @@ class DynamicsDimSide(Dynamics):
         # print(H1[0, 0, 0], "ForDebug LAT in Dynam")
         _H0 = H0.reshape(H0.shape[0], -1, H0.shape[-1])  # b n d
         _H1 = H1.reshape(H1.shape[0], -1, H1.shape[-1])  # b n d
-        M_star = _solveDim(_H0, _H1, mask=mask)
+        M_star = _solve_dim(_H0, _H1, mask=mask)
         # print(M_star[0, 0], "FOR Debu M ")
 
         if orth_proj:
@@ -108,7 +108,7 @@ class DynamicsDimSide(Dynamics):
         return M_star
 
 
-def _solveDim(A, B, mask=None):
+def _solve_dim(A, B, mask=None):
     # return M= B^-1 A : solve A M = B
     # A = A.to(dtype=torch.float64)  # b n d
     # B = B.to(dtype=torch.float64)  # b n d
