@@ -19,6 +19,7 @@ class NFT(nn.Module):
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
+        **kwargs,
     ):
         assert len(encoder) == 1
         assert len(decoder) == 1
