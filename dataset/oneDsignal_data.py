@@ -13,7 +13,7 @@ class Shifted_FreqFun:
     # data is generated at initialization
     def __init__(
         self,
-        Ndata=5000,  # Number of data
+        num_data=5000,  # Number of data
         num_sample_points=128,  # Number of observation points
         num_shifts=3,  # Time steps in a sequence
         shift_label=False,
@@ -37,7 +37,7 @@ class Shifted_FreqFun:
         smallfreq_strength=0,
     ):
         self.num_shifts = num_shifts
-        self.Ndata = Ndata
+        self.num_data = num_data
         self.num_sample_points = num_sample_points
         self.ns = ns
         self.rng = rng if rng is not None else np.random
@@ -79,12 +79,12 @@ class Shifted_FreqFun:
         else:
             print("random freqs")
 
-        # Generation of data (size: Ndata, dim: N)
+        # Generation of data (size: num_data, dim: N)
         fdata = []
         if test > 0:
             np.random.seed(test)
 
-        for i in range(Ndata):
+        for i in range(num_data):
             # Initial function data generated: f(t) = \sum_j coef_j * sin( 2 \pi freqsel_j t)
             if freq_fix:
                 freqsel = self.freqsel
@@ -106,7 +106,7 @@ class Shifted_FreqFun:
             fdata.append(f)
             # fdata.append (f + ns * np.random.randn(N))
 
-        self.data = np.array(fdata)  # data:  Ndata x N (double array)
+        self.data = np.array(fdata)  # data:  num_data x N (double array)
         self.coefs = np.array(self.coefs)
         pdb.set_trace()
 
@@ -114,7 +114,7 @@ class Shifted_FreqFun:
         #   self.shifts specify the shift
         if self.fixedM and (self.shifts is None):
             shifts = []
-            for i in range(Ndata):
+            for i in range(num_data):
                 if i % batchM_size == 0:
                     shift = self.rng.uniform(
                         self.max_shift[0], self.max_shift[1], size=1
@@ -123,12 +123,12 @@ class Shifted_FreqFun:
             self.shifts = np.array(shifts)
         elif self.random_shifts is False:
             #  random shift (this fixes shift for each data)
-            self.shifts = self.max_shift[0] + np.random.rand(Ndata) * (
+            self.shifts = self.max_shift[0] + np.random.rand(num_data) * (
                 self.max_shift[1] - self.max_shift[0]
             )
         else:
             self.shifts = np.zeros(
-                Ndata
+                num_data
             )  # shifts are assigned in __getitem__ at dataloader
 
         self.shared_transition = shared_transition
@@ -167,11 +167,11 @@ class Shifted_FreqFun:
         retval = [fvals]
         retval.append(shift)
         if self.indexing:
-            idx = np.zeros(self.Ndata)
+            idx = np.zeros(self.num_data)
             idx[i] = 1.0
             retval.append(
                 idx
-            )  # idx is a one-hot Ndata-dim vector with 1 at the index of the data
+            )  # idx is a one-hot num_data-dim vector with 1 at the index of the data
 
         return retval  # [data, gelement, [dataidx]] (indexing is added if self.indexing is True)
 
@@ -180,7 +180,7 @@ class Shifted_FreqFun:
 class Shifted_FreqFun_nl:
     def __init__(
         self,
-        Ndata=5000,  # Number of data
+        num_data=5000,  # Number of data
         num_sample_points=128,  # Number of observation points
         num_shifts=3,  # Time steps in a sequence
         shift_label=False,
@@ -203,7 +203,7 @@ class Shifted_FreqFun_nl:
         smallfreqs_strength=0,
     ):
         self.num_shifts = num_shifts
-        self.Ndata = Ndata
+        self.num_data = num_data
         self.num_sample_points = num_sample_points
         self.ns = ns
         self.rng = rng if rng is not None else np.random
@@ -246,7 +246,7 @@ class Shifted_FreqFun_nl:
 
         # In this class (nonlinear), unlike Shifted_freqFun(), data set is not contained in the class, because the time point must be calculated by shifts.
         #   Instead, the frequencies and coefficients to make the latent functions are contained in the class
-        # Generation of data (size: Ndata)
+        # Generation of data (size: num_data)
         # fdata =[]
         freqs = []
         coefs = []
@@ -254,7 +254,7 @@ class Shifted_FreqFun_nl:
             np.random.seed(test)
         print(test)
 
-        for i in range(Ndata):
+        for i in range(num_data):
             if freq_fix:
                 coef = np.random.randn(self.nfreq)
                 coef = coef / np.linalg.norm(coef)
@@ -274,7 +274,7 @@ class Shifted_FreqFun_nl:
 
         self.freqs = np.array(
             freqs
-        )  # self.freqs:  Ndata x nfreq (double array) contains frequencoes to make the latent functions
+        )  # self.freqs:  num_data x nfreq (double array) contains frequencoes to make the latent functions
         #  To make the function values use f =  np.matmul(np.sin(np.outer(2*np.pi*t,self.freqs[i,:])), self.coef)  # function value at latent t
         # self.lat_t = lat_t
         # self.obs_t = obs_t
@@ -283,7 +283,7 @@ class Shifted_FreqFun_nl:
         #   In the batch, the same M(g) is used.  Set shuffle off in Dataloader.
         if self.shift_label and (self.shifts is None):
             shifts = []
-            for i in range(Ndata):
+            for i in range(num_data):
                 if i % batchM_size == 0:
                     shift = self.rng.uniform(
                         self.max_shift[0], self.max_shift[1], size=1
@@ -304,7 +304,7 @@ class Shifted_FreqFun_nl:
         )
 
     def __len__(self):
-        return self.Ndata
+        return self.num_data
 
     def __getitem__(self, i):  # i-th data and its shifts (T shifts)
         freq = self.freqs[i, :]
