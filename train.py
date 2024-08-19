@@ -36,7 +36,7 @@ def main():
     configs["train"] = cfg_train
     configs["model"] = cfg_model
     configs["data"] = cfg_data
-    configs["expname"] = exp_name
+    configs["exp_name"] = exp_name
 
     configs["train"]["device"] = 2
 
@@ -123,7 +123,7 @@ class Trainer:
         decs = []
         owndecs = []
         decstars = []
-        for k in range(nft_args["depth"]):
+        for _ in range(nft_args["depth"]):
             enc1 = enc_class(**model_args, maskmat=mask)
             dec1 = dec_class(**model_args, maskmat=mask)
             decStar = dec_class(**model_args, maskmat=mask)
@@ -138,10 +138,10 @@ class Trainer:
             owndecs=owndecs,
             **nft_args,
         )
-        self.writer_location = f"""./dnftresult/{self.configs['expname']}"""
+        self.writer_location = f"./dnftresult/{self.configs['exp_name']}"
         self.configs["data"]["args"]["T"] = self.trainT
 
-        print(f"""Work will be saved at {self.writer_location}""")
+        print(f"Work will be saved at {self.writer_location}")
 
     def create_masks(self, model_args, layer=0):
         matsize = model_args["dim_m"]
