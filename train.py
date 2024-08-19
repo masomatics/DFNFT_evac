@@ -20,8 +20,7 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mask1layer"
-    # modelname = "fordebug"
+    modelname = "mlp1layer_nonDim"
     datname = "OneDsignal"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -42,7 +41,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 6
+    configs["train"]["device"] = 2
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -94,7 +93,9 @@ class DF_Trainer(object):
         )
 
     def _set_optimizer(self):
-        self.optimizer = torch.optim.Adam(self.nftmodel.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(
+            self.nftmodel.parameters(), lr=self.lr, weight_decay=0.001
+        )
 
     def report(self, value=None, name=None):
         if self.iter % self.report_freq == 0:
@@ -117,14 +118,30 @@ class DF_Trainer(object):
         cfg_model = self.configs["model"]
         enc_class = yu.load_component_fxn(cfg_model["encmodel"])
         dec_class = yu.load_component_fxn(cfg_model["decmodel"])
+        nft_class = yu.load_component_fxn(cfg_model["nftmodel"])
 
         model_args = cfg_model["modelargs"]
         nft_args = cfg_model["nftargs"]
         mask = self.create_masks(model_args)
-        enc1 = enc_class(**model_args, maskmat=mask)
-        dec1 = dec_class(**model_args, maskmat=mask)
-        self.nftmodel = ftd.NFT(
-            encoder=[enc1], decoder=[dec1], require_input_adapter=True, **nft_args
+
+        encs = []
+        decs = []
+        owndecs = []
+        decstars = []
+        for k in range(nft_args["depth"]):
+            enc1 = enc_class(**model_args, maskmat=mask)
+            dec1 = dec_class(**model_args, maskmat=mask)
+            decStar = dec_class(**model_args, maskmat=mask)
+            encs.append(enc1)
+            decs.append(dec1)
+            decstars.append(decStar)
+
+        self.nftmodel = nft_class(
+            encoder=encs,
+            decoder=decs,
+            require_input_adapter=True,
+            owndecs=owndecs,
+            **nft_args,
         )
         self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT

@@ -60,6 +60,7 @@ class MLP_AE(nn.Module):
         activation="tanh",
         require_input_adapter=False,
         maskmat=None,
+        no_mask=False,
     ):
         super().__init__()
         self.dim_a = dim_a
@@ -68,6 +69,7 @@ class MLP_AE(nn.Module):
         self.predictive = predictive
         self.dim_data = dim_data
         self.no_embed = True
+        self.no_mask = no_mask
         self.maskmat = nn.Parameter(maskmat, requires_grad=False)
         self.hidden_dim = hidden_dim
         self.require_input_adapter = require_input_adapter
@@ -104,7 +106,7 @@ class MLPEncoder(MLP_AE):
             dimlist[0] = self.dim_data
         dimlist[-1] = self.dim_latent
         for k in range(1, 1 + self.depth):
-            if len(self.maskmat) == 0 or self.dim_m == 0:
+            if self.no_mask == True or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
@@ -119,14 +121,13 @@ class MLPEncoder(MLP_AE):
 
             if k < self.depth:
                 modseq.append(self.activation_fxn)
-
-        self.phi = nn.Sequential(*modseq)
+        self.net = nn.Sequential(*modseq)
 
     def forward(self, signal):
         xs = signal
         if not self.require_input_adapter:
             xs = rearrange(xs, "... d m -> ... (d m)")
-        H = self.phi(xs)
+        H = self.net(xs)
         H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
         return H
 
@@ -146,7 +147,7 @@ class MLPDecoder(MLP_AE):
         dimlist[0] = self.dim_latent
         modseq = nn.ModuleList()
         for k in range(1, 1 + self.depth):
-            if len(self.maskmat) == 0 or self.dim_m == 0:
+            if self.no_mask == True or self.dim_m == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(

@@ -9,8 +9,8 @@ decmodel:
 
 modelargs:
   dim_data: 128
-  dim_m: 10
-  dim_a: 16
+  dim_m: 16
+  dim_a: 10
   depth: 3
   predictive: True
   transition_model: LS
@@ -19,9 +19,9 @@ modelargs:
 
 nftmodel: 
   fn: ./module/ft_decimation
-  name: DFNFToneD
+  name: NFT
 
 nftargs:
   orth_proj: True
   depth: 1
-  is_Dimside: False
+  is_Dimside: True
