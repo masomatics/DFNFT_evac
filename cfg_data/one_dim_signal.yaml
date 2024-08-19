@@ -1,4 +1,4 @@
-  fn: ./dataset/oneDsignal_data.py
+  fn: ./dataset/one_dim_signal.py
   name: ShiftedFreqFunNonLinear
   args:
     num_data: 30000
