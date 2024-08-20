@@ -89,8 +89,7 @@ class CyclicGroupSignal(Dataset):
             signal = np.matmul(
                 np.sin(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
                 sin_coeffs,
-            )
-            +np.matmul(
+            ) + np.matmul(
                 np.cos(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
                 cos_coeffs,
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
