@@ -55,23 +55,19 @@ class NFT(nn.Module):
         return latent_preds
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
-    def do_encode(self, obs, embed=None, is_reshaped=False):
+    def do_encode(self, obs, embed=None):
         # expect   N T C H W
-        if is_reshaped:
-            obs_nt = obs  # Already in (b,t) format
-        else:
-            b, t = obs.shape[0], obs.shape[1]
-            obs_nt = rearrange(obs, "b t ... -> (b t) ...")
-
+        b, t = obs.shape[0], obs.shape[1]
+        obs_nt = rearrange(obs, "b t ... -> (b t) ...")
         latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
         bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
         return latent
 
-    def do_decode(self, latent, batchsize, do_reshape=True):
+    def do_decode(self, latent, do_reshape=True):
         # expect input N T dim
+        batchsize = latent.shape[0]
         latent = rearrange(latent, "n t ... -> (n t) ...")
-
         obshat_batched = self.decoder(latent)  # (N T) obshape
         if do_reshape:
             obshat = rearrange(obshat_batched, "(n t) ... -> n t ...", n=batchsize)
@@ -102,7 +98,7 @@ class NFT(nn.Module):
         # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
         # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
 
-        predicted = self.do_decode(latent_preds, batchsize=batchsize)  # X0, X1, X2, ...
+        predicted = self.do_decode(latent_preds)  # X0, X1, X2, ...
         # print(predicted[0, -1, :5], "Debug XPred")
 
         return predicted
@@ -185,7 +181,7 @@ class DFNFT(NFT):
         latent = obs
         latents = []
         for k in range(self.depth):
-            latent = self.nftlayers[k].do_encode(obs)
+            latent = self.nftlayers[k].do_encode(latent)
             latents.append(latent)
         return latents
 
@@ -196,19 +192,16 @@ class DFNFT(NFT):
         for j in range(layer_idx_from_bottom, self.depth):
             loc = self.depth - (j + 1)
             latent = self.owndecoders[loc](latent)
+
         obshat = latent
         obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
     def intermediate_decode(self, kth_latent, layer_idx_from_bottom=0):
-        batchsize = kth_latent.shape[0]
-        kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
-        kplus1th_latent = self.nftlayers[self.depth - layer_idx_from_bottom].do_decode(
-            kth_latent
-        )
-        kplus1th_latent = rearrange(
-            kplus1th_latent, "(n t) ... -> n t ...", n=batchsize
-        )
+        # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
+        kplus1th_latent = self.nftlayers[
+            (self.depth - 1) - layer_idx_from_bottom
+        ].do_decode(kth_latent)
         return kplus1th_latent
 
     def __call__(self, obs, n_rolls=1):
@@ -253,8 +246,7 @@ class DFNFT(NFT):
         # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
         targets = [obstuple] + latent_preds[:-1]
 
-        targets = []
-        intermediate_loss = 0
+        intermediate_loss = torch.tensor([0.0]).to(predfuture.device)
         for k in range(self.depth):
             if k == self.depth - 1:
                 predloss = self.lossfxn(obstuple, predfuture)
@@ -267,8 +259,7 @@ class DFNFT(NFT):
         #     obstuple[:, 1:], predfuture[:, 1:]
         # )  # d([X1hat, X1], [X2hat, X2])
 
-        loss = {"all_loss": predloss}
-        loss["intermediate"] = torch.tensor([0.0])
+        loss = {"all_loss": predloss + intermediate_loss}
+        loss["intermediate"] = intermediate_loss
         loss["predloss"] = predloss
-
         return loss

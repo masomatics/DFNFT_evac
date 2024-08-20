@@ -20,7 +20,7 @@ from misc import yaml_util as yu
 
 def main():
     # modename
-    modelname = "mask1Stacklayer"
+    modelname = "mask2Stacklayer"
     # modelname = "fordebug"
     datname = "OneDsignal_c8mimic"
     # datname = "OneDCyclic"
@@ -43,7 +43,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 1
+    configs["train"]["device"] = 3
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -133,20 +133,20 @@ class DF_Trainer(object):
         decstars = []
         nftmodels = []
         for k in range(nft_args["depth"]):
-            if nft_args["depth"] == 1:
-                mask = self.create_masks(model_args, layer=k)
-            else:
-                mask = self.create_masks(model_args, layer=k + 1)
-            pdb.set_trace()
-            enc1 = enc_class(**model_args, maskmat=mask)
-            dec1 = dec_class(**model_args, maskmat=mask)
-            decStar = dec_class(**model_args, maskmat=mask)
+            model_args_k = copy.deepcopy(model_args)
+            mask = self.create_masks(model_args_k, layer=k)
+            if k > 0:
+                # Se the next dim_data to be the previous latent_dim.
+                model_args_k["dim_data"] = nftmodels[k - 1].encoder.dim_latent
+            enc_k = enc_class(**model_args_k, maskmat=mask)
+            dec_k = dec_class(**model_args_k, maskmat=mask)
+            decStar = dec_class(**model_args_k, maskmat=mask)
             decstars.append(decStar)
 
             nftmodel = nft_class(
-                encoder=enc1,
-                decoder=dec1,
-                require_input_adapter=True,
+                encoder=enc_k,
+                decoder=dec_k,
+                require_input_adapter=k == 0,
                 owndecs=owndecs,
                 **nft_args,
             )
@@ -192,7 +192,7 @@ class DF_Trainer(object):
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
 
-            loss["predloss"].backward()
+            loss["all_loss"].backward()
             self.optimizer.step()
 
             all_loss = loss["all_loss"].item()
