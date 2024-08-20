@@ -54,15 +54,18 @@ class ShiftedFreqFunNonLinear:
         else:
             self.smallfreqs_strength = 0
 
-
         if freq_fix:
             if freq_manual:
-                assert len(freq_manual) == self.num_freqs, f"{len(freq_manual)=}, {self.num_freqs=}"
+                assert (
+                    len(freq_manual) == self.num_freqs
+                ), f"{len(freq_manual)=}, {self.num_freqs=}"
                 self.fixed_freqss = freq_manual
             else:
                 np.random.seed(freqseed)
                 self.fixed_freqss = np.random.randint(
-                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.num_freqs
+                    0,
+                    np.ceil(num_sample_points / (5 * self.shift_range)),
+                    self.num_freqs,
                 )
             print(self.fixed_freqss)
         else:
@@ -79,7 +82,7 @@ class ShiftedFreqFunNonLinear:
         freqs = []
         sin_coeffs = []
         cos_coeffs = []
-        
+
         if test > 0:
             np.random.seed(test)
         print(test)
@@ -105,7 +108,9 @@ class ShiftedFreqFunNonLinear:
                 freqs.append(self.fixed_freqss)
             else:
                 fixed_freqss = np.random.randint(
-                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.num_freqs
+                    0,
+                    np.ceil(num_sample_points / (5 * self.shift_range)),
+                    self.num_freqs,
                 )  # randomly selected frequencies
                 freqs.append(fixed_freqss)
 
@@ -113,7 +118,7 @@ class ShiftedFreqFunNonLinear:
             freqs
         )  # self.freqs:  num_data x num_freqs (double array) contains frequencoes to make the latent functions
         #  To make the function values use f =  np.matmul(np.sin(np.outer(2*np.pi*t,self.freqs[i,:])), self.sin_coeff) + np.matmul(np.cos(np.outer(2*np.pi*t,self.freqs[i,:])), self.cos_coeff) # function value at latent t
- 
+
         self.sin_coeffs = np.array(sin_coeffs)
         self.cos_coeffs = np.array(cos_coeffs)
 
@@ -160,7 +165,7 @@ class ShiftedFreqFunNonLinear:
         for t in range(self.num_shifts):  # shift * t ( action up to T times)
             lat_t = np.power(obs_t, self.pow) - t * shift / (2 * math.pi)
             lat_t = lat_t + (lat_t < 0) * (1.0)
-          
+
             fobs_t = np.matmul(
                 np.sin(np.outer(2 * np.pi * lat_t, freq)), self.sin_coeffs[i]
             ) + np.matmul(

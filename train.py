@@ -18,7 +18,7 @@ from module.ft_decimation import NFT
 
 def main():
     model_name = "fordebug"
-    data_name = "one_dim_signal"
+    data_name = "one_dim_cyclic"
     train_name = "baseline"
     exp_name = f"{data_name}_{model_name}_{train_name}"
 
