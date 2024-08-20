@@ -30,12 +30,12 @@ class CyclicGroupSignal(Dataset):
         random.seed(0)
         np.random.seed(0)
 
-        self.fixed_freq = np.array(
+        self.fixed_freqs = np.array(
             random.sample(range(self.group_order // 2), num_freqs)
         )
         # (num_freq, )
         self.freqs = np.array(
-            [self.fixed_freq for _ in range(self.num_data)]
+            [self.fixed_freqs for _ in range(self.num_data)]
         )  # (num_data, num_freqs)
         assert self.freqs.shape == (self.num_data, num_freqs)
 
