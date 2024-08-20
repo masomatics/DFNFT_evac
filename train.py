@@ -134,9 +134,17 @@ class DF_Trainer(object):
         nftmodels = []
         for k in range(nft_args["depth"]):
             model_args_k = copy.deepcopy(model_args)
-            mask = self.create_masks(model_args_k, layer=k)
+            """
+            TEMPORARY TREATMENT. MASKS 
+            """
+            if nft_args["depth"] == 1:
+                mask = self.create_masks(model_args_k, layer=k)
+            else:
+                mask = self.create_masks(model_args_k, layer=1)
+
             if k > 0:
                 # Se the next dim_data to be the previous latent_dim.
+
                 model_args_k["dim_data"] = nftmodels[k - 1].encoder.dim_latent
             enc_k = enc_class(**model_args_k, maskmat=mask)
             dec_k = dec_class(**model_args_k, maskmat=mask)
