@@ -59,15 +59,15 @@ class ShiftedFreqFunNonLinear:
                 assert (
                     len(freq_manual) == self.num_freqs
                 ), f"{len(freq_manual)=}, {self.num_freqs=}"
-                self.fixed_freqss = freq_manual
+                self.fixed_freqs = freq_manual
             else:
                 np.random.seed(freqseed)
-                self.fixed_freqss = np.random.randint(
+                self.fixed_freqs = np.random.randint(
                     0,
                     np.ceil(num_sample_points / (5 * self.shift_range)),
                     self.num_freqs,
                 )
-            print(self.fixed_freqss)
+            print(self.fixed_freqs)
         else:
             print("random freqs")
 
@@ -105,7 +105,7 @@ class ShiftedFreqFunNonLinear:
             cos_coeffs.append(cos_coeff)
 
             if freq_fix:
-                freqs.append(self.fixed_freqss)
+                freqs.append(self.fixed_freqs)
             else:
                 fixed_freqss = np.random.randint(
                     0,

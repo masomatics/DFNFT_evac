@@ -9,13 +9,15 @@ from matplotlib import pyplot as plt
 
 from einops import rearrange
 from module import dynamics as dyn
+from torch import Tensor
 
 
 class NFT(nn.Module):
     def __init__(
         self,
-        encoder: list,
-        decoder: list,
+        encoder: list[nn.Module],
+        decoder: list[nn.Module],
+        dynamics_mask: Tensor,
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
@@ -38,21 +40,11 @@ class NFT(nn.Module):
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
 
-    def latent_shift(self, insignal, n_rolls, mask, intervene_fxn=None):
-        # determine the regressor on H0, H1
-        self.dynamics._compute_M(insignal[:, :2], mask, orth_proj=self.orth_proj)
-
-        terminal_latent = insignal[:, [0]]  # H0
-        latent_preds = [terminal_latent]
-        for k in range(n_rolls):
-            shifted_latent = self.dynamics(
-                terminal_latent, intervene_fxn=intervene_fxn
-            )  # Hk+2
-            terminal_latent = shifted_latent
-            latent_preds.append(shifted_latent)
-        latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2, ...
-
-        return latent_preds
+        assert (
+            len(dynamics_mask.shape) == 2
+            and dynamics_mask.shape[0] == dynamics_mask.shape[1]
+        )
+        self.dynamics_mask = dynamics_mask
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, is_reshaped=False):
@@ -110,7 +102,7 @@ class NFT(nn.Module):
 
     def shift_latent(self, latent, n_rolls=1):
         # determine the regressor on H0, H1
-        self.dynamics._compute_M(latent[:, :2])
+        self.dynamics._compute_M(latent[:, :2], mask=self.dynamics_mask)
         # print(self.dynamics.M[0, 0], "FOR Debug M")
         latent_preds = [latent[:, [0]], latent[:, [1]]]
         terminal_latent = latent[:, [1]]  # H1

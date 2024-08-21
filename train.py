@@ -15,6 +15,8 @@ from misc import yaml_util as yu
 
 from module.ft_decimation import NFT
 
+from torch import Tensor
+
 
 def main():
     model_name = "fordebug"
@@ -118,24 +120,22 @@ class Trainer:
         model_args["dim_data"] = self.data.num_sample_points
         nft_args = cfg_model["nftargs"]
         mask = self.create_masks(model_args)
-
+        dynamics_mask = self.create_dynamics_mask(model_args=model_args)
         encs = []
         decs = []
-        owndecs = []
-        decstars = []
+
         for _ in range(nft_args["depth"]):
             enc1 = enc_class(**model_args, maskmat=mask)
             dec1 = dec_class(**model_args, maskmat=mask)
-            decStar = dec_class(**model_args, maskmat=mask)
             encs.append(enc1)
             decs.append(dec1)
-            decstars.append(decStar)
 
         self.nftmodel: NFT = nft_class(
             encoder=encs,
             decoder=decs,
+            dynamics_mask=dynamics_mask,
             require_input_adapter=True,
-            owndecs=owndecs,
+            owndecs=[],
             **nft_args,
         )
         self.writer_location = f"./dnftresult/{self.configs['exp_name']}"
@@ -151,6 +151,13 @@ class Trainer:
             blocksize = matsize // 2
             block = torch.ones(blocksize, blocksize, requires_grad=False)
             mask = torch.block_diag(block, block)
+        return mask
+
+    def create_dynamics_mask(self, model_args) -> Tensor:
+        matsize = model_args["dim_m"]
+        blocksize = matsize // 2
+        block = torch.ones(blocksize, blocksize, requires_grad=False)
+        mask = torch.block_diag(block, block)
         return mask
 
     def train(self):
