@@ -9,8 +9,8 @@ decmodel:
 
 modelargs:
   dim_data: 128
-  dim_m: 10
-  dim_a: 16
+  dim_m: 12
+  dim_a: 12
   depth: 1
   hidden_dim: 260
   predictive: True
@@ -22,7 +22,7 @@ nftmodel:
   name: DFNFT
 
 nftargs:
-  orth_proj: False
+  orth_proj: True
   depth: 2
   is_Dimside: False
   nftlayer: 

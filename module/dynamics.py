@@ -55,6 +55,7 @@ class Dynamics(object):
         return gH
 
     def _compute_M(self, H, mask=None, orth_proj=False):
+        self.mask = mask
         # H = H.to(dtype=torch.float64)
         H0, H1 = H[:, :-1], H[:, 1:]  # b 1 n d
 
@@ -64,7 +65,9 @@ class Dynamics(object):
         M_star = _solve(_H0, _H1, mask=mask)
         if orth_proj:
             M_star = op.orthogonal_projection_kernel(M_star)
-        self.M = M_star  # check  "_mse( M_star[0] @_H0[0] , _H1[0])" and  _mse(self(H0), H1) is small
+        self.M = M_star * mask[None, :]
+
+        # check  "_mse( M_star[0] @_H0[0] , _H1[0])" and  _mse(self(H0), H1) is small
         # print(f"""H0 svd : {torch.linalg.svd(H0)[1][0]} """ )
         # print(f"""Regression error: {_mse(self(H0), H1)}""" )
 

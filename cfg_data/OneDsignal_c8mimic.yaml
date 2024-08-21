@@ -8,9 +8,9 @@
     shift_label: True
     shift_range: 0.4
     batchM_size: 20
-    nfreq: 5
+    nfreq: 4
     freq_fix: True
     freqseed: 1 
     smallfreqs_num: 0
     smallfreqs_strength: 0.0
-    freq_manual: [0, 8, 16, 32, 56]
+    freq_manual: [0, 2, 10, 16, 23, 7]

@@ -38,22 +38,6 @@ class NFT(nn.Module):
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
 
-    def latent_shift(self, insignal, n_rolls, mask, intervene_fxn=None):
-        # determine the regressor on H0, H1
-        self.dynamics._compute_M(insignal[:, :2], mask, orth_proj=self.orth_proj)
-
-        terminal_latent = insignal[:, [0]]  # H0
-        latent_preds = [terminal_latent]
-        for k in range(n_rolls):
-            shifted_latent = self.dynamics(
-                terminal_latent, intervene_fxn=intervene_fxn
-            )  # Hk+2
-            terminal_latent = shifted_latent
-            latent_preds.append(shifted_latent)
-        latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2, ...
-
-        return latent_preds
-
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, embed=None):
         # expect   N T C H W
@@ -75,14 +59,14 @@ class NFT(nn.Module):
             obshat = obshat_batched
         return obshat
 
-    def __call__(self, obs, n_rolls=1):
+    def __call__(self, obs, n_rolls=1, mask=None):
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
         latent = self.do_encode(obs)  # b t n a
         # print(latent[0, 0, :5], "ForDebug LAT")
         # print(latent[0, 1, :5], "ForDebug LAT")
 
-        latent_preds = self.shift_latent(latent, n_rolls=n_rolls)
+        latent_preds = self.shift_latent(latent, n_rolls=n_rolls, mask=mask)
         # determine the regressor on H0, H1
         # self.dynamics._compute_M(latent[:, :2])
         # # print(self.dynamics.M[0, 0], "FOR Debug M")
@@ -103,9 +87,9 @@ class NFT(nn.Module):
 
         return predicted
 
-    def shift_latent(self, latent, n_rolls=1):
+    def shift_latent(self, latent, n_rolls=1, mask=None):
         # determine the regressor on H0, H1
-        self.dynamics._compute_M(latent[:, :2])
+        self.dynamics._compute_M(latent[:, :2], mask, orth_proj=self.orth_proj)
         # print(self.dynamics.M[0, 0], "FOR Debug M")
         latent_preds = [latent[:, [0]], latent[:, [1]]]
         terminal_latent = latent[:, [1]]  # H1
@@ -214,7 +198,12 @@ class DFNFT(NFT):
         for k in range(self.depth):
             # determine the regressor on H0, H1
             latent = latents[k]
-            latent_pred = self.nftlayers[k].shift_latent(latent, n_rolls=n_rolls)
+            # Use the next mask
+            maskidx = min(self.depth - 1, k + 1)
+            mask_k = self.nftlayers[maskidx].encoder.maskmat
+            latent_pred = self.nftlayers[k].shift_latent(
+                latent, n_rolls=n_rolls, mask=mask_k
+            )
             latent_preds.append(latent_pred)
 
         intermediate_preds = []
@@ -251,9 +240,23 @@ class DFNFT(NFT):
             if k == self.depth - 1:
                 predloss = self.lossfxn(obstuple, predfuture)
             else:
+                # noise (EXPERIMENTAL)
+                # intermediate_loss = self.lossfxn(
+                #     torch.mean(latent_preds[0], axis=-1, keepdims=True), latent_preds[0]
+                # )
+                # ep = torch.normal(mean=torch.zeros(size=targets[k].shape), std=0.0).to(
+                #     targets[k].device
+                # )
                 intermediate_loss = intermediate_loss + self.lossfxn(
                     targets[k], intermediate_preds[k]
                 )
+                # intermediate_loss = intermediate_loss + self.lossfxn(
+                #     torch.mean(targets[k], axis=-1, keepdims=True),
+                #     intermediate_preds[k],
+                # )
+                # intermediate_loss = intermediate_loss + self.lossfxn(
+                #     targets[k] + ep, intermediate_preds[k]
+                # )
 
         # predloss = dyn._mse(
         #     obstuple[:, 1:], predfuture[:, 1:]

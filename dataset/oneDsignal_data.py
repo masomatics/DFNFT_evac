@@ -107,13 +107,12 @@ class Shifted_FreqFun:
                 )  # randomly selected frequencies
                 coef = self.coef
 
-            f = np.matmul(np.sin(np.outer(2 * np.pi * t, freqsel)), coef)
+            f = np.matmul(np.cos(np.outer(2 * np.pi * t, freqsel)), coef)
             fdata.append(f)
             # fdata.append (f + ns * np.random.randn(N))
 
         self.data = np.array(fdata)  # data:  Ndata x N (double array)
         self.coefs = np.array(self.coefs)
-        pdb.set_trace()
 
         #   for fixedM senairo,the same M(g) is used in a batch.  Set shuffle off in Dataloader.
         #   self.shifts specify the shift
@@ -238,6 +237,7 @@ class Shifted_FreqFun_nl:
         if freq_fix == True:
             if len(freq_manual) > 0:
                 self.freqsel = freq_manual
+                self.nfreq = len(self.freqsel)
             else:
                 np.random.seed(freqseed)
                 self.freqsel = np.random.randint(
@@ -282,7 +282,7 @@ class Shifted_FreqFun_nl:
         self.freqs = np.array(
             freqs
         )  # self.freqs:  Ndata x nfreq (double array) contains frequencoes to make the latent functions
-        #  To make the function values use f =  np.matmul(np.sin(np.outer(2*np.pi*t,self.freqs[i,:])), self.coef)  # function value at latent t
+        #  To make the function values use f =  np.matmul(np.cos(np.outer(2*np.pi*t,self.freqs[i,:])), self.coef)  # function value at latent t
         # self.lat_t = lat_t
         # self.obs_t = obs_t
         self.coefs = np.array(coefs)
@@ -331,7 +331,9 @@ class Shifted_FreqFun_nl:
             lat_t = np.power(obs_t, self.pow) - t * shift / (2 * math.pi)
             lat_t = lat_t + (lat_t < 0) * (1.0)
             fobs_t = np.matmul(
-                np.sin(np.outer(2 * np.pi * lat_t, freq)), self.coefs[i]
+                np.cos(np.outer(2 * np.pi * lat_t, freq))
+                + np.sin(np.outer(2 * np.pi * lat_t, freq)),
+                self.coefs[i],
             )  # fn_t(j) = f_lat((t_j)**pow - shift*t)
             fvals.append(torch.tensor(fobs_t))
 
