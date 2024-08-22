@@ -30,25 +30,32 @@ class CyclicGroupSignal(Dataset):
         random.seed(0)
         np.random.seed(0)
 
-        self.fixed_freq = np.array(
+        self.fixed_freqs = np.array(
             random.sample(range(self.group_order // 2), num_freqs)
         )
-        # (num_freq, )
+        # (num_freqs, )
         self.freqs = np.array(
-            [self.fixed_freq for _ in range(self.num_data)]
+            [self.fixed_freqs for _ in range(self.num_data)]
         )  # (num_data, num_freqs)
         assert self.freqs.shape == (self.num_data, num_freqs)
 
-        coeff_list = []
+        sin_coeff_list = []
+        cos_coeff_list = []
         for _ in range(self.num_data):
-            coeff = np.random.randn(num_freqs)
-            coeff = coeff / np.linalg.norm(coeff)
-            coeff_list.append(coeff)
+            sin_coeff = np.random.randn(num_freqs)
+            sin_coeff = sin_coeff / np.linalg.norm(sin_coeff)
+            sin_coeff_list.append(sin_coeff)
 
-        self.coeffs = np.array(coeff_list)  # (num_data, num_freqs)
-        assert self.coeffs.shape == (self.num_data, num_freqs)
+            cos_coeff = np.random.randn(num_freqs)
+            cos_coeff = cos_coeff / np.linalg.norm(cos_coeff)
+            cos_coeff_list.append(cos_coeff)
 
-        # The initial value of the i-th signal (without diffeo) is f_i(t) = \sum_j self.coeffs[i][j] * sin(2*pi*t*self.freqs[i][j])
+        self.sin_coeffs = np.array(sin_coeff_list)  # (num_data, num_freqs)
+        self.cos_coeffs = np.array(cos_coeff_list)
+        assert self.sin_coeffs.shape == (self.num_data, num_freqs)
+        assert self.cos_coeffs.shape == (self.num_data, num_freqs)
+
+        # The initial value of the i-th signal (without diffeo) is f_i(t) = \sum_j self.sin_coeffs[i][j] * sin(2*pi*t*self.freqs[i][j]) + self.cos_coeffs[i][j] * cos(2*pi*t*self.freqs[i][j])
 
         self.gs = np.random.choice(self.group_order, num_data)
         # (num_data, ), gs[i] is a random element of G
@@ -61,7 +68,8 @@ class CyclicGroupSignal(Dataset):
         return: shape=(self.num_shifts, self.num_samples)
         """
         freqs = self.freqs[i]  # num_freqs
-        coeffs = self.coeffs[i]
+        sin_coeffs = self.sin_coeffs[i]
+        cos_coeffs = self.cos_coeffs[i]
         g = self.gs[i]
         g_action = g / self.group_order
         dt = 1.0 / self.num_sample_points
@@ -79,8 +87,11 @@ class CyclicGroupSignal(Dataset):
             )
 
             signal = np.matmul(
+                np.sin(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
+                sin_coeffs,
+            ) + np.matmul(
                 np.cos(np.outer(2 * np.pi * sampling_t_after_diffeo_and_shift, freqs)),
-                coeffs,
+                cos_coeffs,
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
             shifted_signals.append(torch.from_numpy(signal))
 

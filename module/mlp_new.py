@@ -125,7 +125,7 @@ class MLPEncoder(MLPAE):
     def forward(self, signal):
         xs = signal
         if not self.require_input_adapter:
-            xs = rearrange(xs, "... d m -> ... (d m)")           
+            xs = rearrange(xs, "... d m -> ... (d m)")
         H = self.net(xs)
         H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
         return H

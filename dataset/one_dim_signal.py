@@ -22,8 +22,7 @@ class ShiftedFreqFunNonLinear:
         max_shift=[0.0, 2 * math.pi / 2],  # range of shift action (in radian)
         shared_transition=False,
         rng=None,
-        nfreq=5,  # Number of selected frequecy to make a function
-        coef=None,  # Coefficients of the selected frequencies.
+        num_freqs=5,  # Number of selected frequecy to make a function
         ns=0.0,  # Noise level of additive Gaussian noise
         pow=3,
         shifts=None,
@@ -40,7 +39,7 @@ class ShiftedFreqFunNonLinear:
         self.num_sample_points = num_sample_points
         self.ns = ns
         self.rng = rng if rng is not None else np.random
-        self.nfreq = nfreq + smallfreqs_num
+        self.num_freqs = num_freqs + smallfreqs_num
         self.shift_range = shift_range  # control the frequency range of data
         self.max_shift = max_shift
         self.shift_label = shift_label
@@ -55,21 +54,20 @@ class ShiftedFreqFunNonLinear:
         else:
             self.smallfreqs_strength = 0
 
-        if coef is None:
-            coef = np.random.randn(self.nfreq)
-            coef = coef / np.linalg.norm(coef)
-            # coef = coef/nfreq
-        self.coef = coef
-
         if freq_fix:
-            if len(freq_manual) > 0:
-                self.freqsel = freq_manual
+            if freq_manual:
+                assert (
+                    len(freq_manual) == self.num_freqs
+                ), f"{len(freq_manual)=}, {self.num_freqs=}"
+                self.fixed_freqss = freq_manual
             else:
                 np.random.seed(freqseed)
-                self.freqsel = np.random.randint(
-                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.nfreq
+                self.fixed_freqss = np.random.randint(
+                    0,
+                    np.ceil(num_sample_points / (5 * self.shift_range)),
+                    self.num_freqs,
                 )
-            print(self.freqsel)
+            print(self.fixed_freqss)
         else:
             print("random freqs")
 
@@ -82,36 +80,47 @@ class ShiftedFreqFunNonLinear:
         # Generation of data (size: num_data)
         # fdata =[]
         freqs = []
-        coefs = []
+        sin_coeffs = []
+        cos_coeffs = []
+
         if test > 0:
             np.random.seed(test)
         print(test)
 
         for i in range(num_data):
-            if freq_fix:
-                coef = np.random.randn(self.nfreq)
-                coef = coef / np.linalg.norm(coef)
-                if self.smallfreqs_num > 0:
-                    coef[-self.smallfreqs_num :] = (
-                        self.smallfreqs_strength * coef[-self.smallfreqs_num :]
-                    )
-                coefs.append(coef)
-                freqs.append(self.freqsel)
+            sin_coeff = np.random.randn(self.num_freqs)
+            sin_coeff = sin_coeff / np.linalg.norm(sin_coeff)
+            if self.smallfreqs_num > 0:
+                sin_coeff[-self.smallfreqs_num :] = (
+                    self.smallfreqs_strength * sin_coeff[-self.smallfreqs_num :]
+                )
+            sin_coeffs.append(sin_coeff)
 
+            cos_coeff = np.random.randn(self.num_freqs)
+            cos_coeff = cos_coeff / np.linalg.norm(cos_coeff)
+            if self.smallfreqs_num > 0:
+                cos_coeff[-self.smallfreqs_num :] = (
+                    self.smallfreqs_strength * cos_coeff[-self.smallfreqs_num :]
+                )
+            cos_coeffs.append(cos_coeff)
+
+            if freq_fix:
+                freqs.append(self.fixed_freqss)
             else:
-                freqsel = np.random.randint(
-                    0, np.ceil(num_sample_points / (5 * self.shift_range)), self.nfreq
+                fixed_freqss = np.random.randint(
+                    0,
+                    np.ceil(num_sample_points / (5 * self.shift_range)),
+                    self.num_freqs,
                 )  # randomly selected frequencies
-                freqs.append(freqsel)
-                coefs.append(self.coef)
+                freqs.append(fixed_freqss)
 
         self.freqs = np.array(
             freqs
-        )  # self.freqs:  num_data x nfreq (double array) contains frequencoes to make the latent functions
-        #  To make the function values use f =  np.matmul(np.sin(np.outer(2*np.pi*t,self.freqs[i,:])), self.coef)  # function value at latent t
-        # self.lat_t = lat_t
-        # self.obs_t = obs_t
-        self.coefs = np.array(coefs)
+        )  # self.freqs:  num_data x num_freqs (double array) contains frequencoes to make the latent functions
+        #  To make the function values use f =  np.matmul(np.sin(np.outer(2*np.pi*t,self.freqs[i,:])), self.sin_coeff) + np.matmul(np.cos(np.outer(2*np.pi*t,self.freqs[i,:])), self.cos_coeff) # function value at latent t
+
+        self.sin_coeffs = np.array(sin_coeffs)
+        self.cos_coeffs = np.array(cos_coeffs)
 
         #   In the batch, the same M(g) is used.  Set shuffle off in Dataloader.
         if self.shift_label and (self.shifts is None):
@@ -156,8 +165,11 @@ class ShiftedFreqFunNonLinear:
         for t in range(self.num_shifts):  # shift * t ( action up to T times)
             lat_t = np.power(obs_t, self.pow) - t * shift / (2 * math.pi)
             lat_t = lat_t + (lat_t < 0) * (1.0)
+
             fobs_t = np.matmul(
-                np.sin(np.outer(2 * np.pi * lat_t, freq)), self.coefs[i]
+                np.sin(np.outer(2 * np.pi * lat_t, freq)), self.sin_coeffs[i]
+            ) + np.matmul(
+                np.cos(np.outer(2 * np.pi * lat_t, freq)), self.cos_coeffs[i]
             )  # fn_t(j) = f_lat((t_j)**pow - shift*t)
             fvals.append(torch.tensor(fobs_t))
 
