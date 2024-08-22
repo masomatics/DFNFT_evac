@@ -64,16 +64,16 @@ class NFT(nn.Module):
             obs_nt = rearrange(obs, "b t ... -> (b t) ...")
 
         latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
-        latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
+        latent = rearrange(latent_bt, "(b t) ... -> b t ...", b=b)
         return latent
 
     def do_decode(self, latent, batch_size, do_reshape=True):
         # expect input N T dim
-        latent = rearrange(latent, "n t ... -> (n t) ...")
+        latent = rearrange(latent, "b t ... -> (b t) ...")
 
         obshat_batched = self.decoder(latent)  # (N T) obshape
         if do_reshape:
-            obshat = rearrange(obshat_batched, "(n t) ... -> n t ...", n=batch_size)
+            obshat = rearrange(obshat_batched, "(b t) ... -> b t ...", b=batch_size)
         else:
             obshat = obshat_batched
         return obshat

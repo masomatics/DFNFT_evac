@@ -66,8 +66,8 @@ class MLPDecBase(nn.Module):
 class MLPAE(nn.Module):
     def __init__(
         self,
-        dim_a,
         dim_m,
+        dim_d,
         depth=3,
         transition_model="LS",
         dim_data=128,
@@ -81,8 +81,8 @@ class MLPAE(nn.Module):
         no_mask=True,
     ):
         super().__init__()
-        self.dim_a = dim_a
         self.dim_m = dim_m
+        self.dim_d = dim_d
         self.depth = depth
         self.predictive = predictive
         self.dim_data = dim_data
@@ -108,7 +108,7 @@ class MLPEncoder(MLPAE):
         super().__init__(**kwargs)
         self.enc = MLPEncBase(
             dim_data=self.dim_data,
-            dim_latent=self.dim_a * self.dim_m,
+            dim_latent=self.dim_m * self.dim_d,
             act=self.activation_fxn,
             depth=self.depth,
         )
@@ -120,7 +120,7 @@ class MLPEncoder(MLPAE):
     def forward(self, signal):
         xs = signal
         H = self._encode_base(xs, self.enc)
-        H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
+        H = torch.reshape(H, (H.shape[0], self.dim_d, self.dim_m))
         # if hasattr(self, "change_of_basis"):
         #     H = H @ repeat(self.change_of_basis,
         #                    'a1 a2 -> n t a1 a2', n=H.shape[0], t=H.shape[1])
@@ -132,7 +132,7 @@ class MLPDecoder(MLPAE):
         super().__init__(**kwargs)
         self.dec = MLPDecBase(
             dim_data=self.dim_data,
-            dim_latent=self.dim_a * self.dim_m,
+            dim_latent=self.dim_m * self.dim_d,
             act=self.activation_fxn,
             depth=self.depth,
         )
