@@ -13,8 +13,9 @@ import torch
 class ShiftedFreqFunNonLinear:
     def __init__(
         self,
+        num_freqs,  # Number of selected frequecy to make a function
+        num_sample_points,  # Number of observation points
         num_data=5000,  # Number of data
-        num_sample_points=128,  # Number of observation points
         num_shifts=3,  # Time steps in a sequence
         shift_label=False,
         batchM_size=1,
@@ -22,12 +23,11 @@ class ShiftedFreqFunNonLinear:
         max_shift=[0.0, 2 * math.pi / 2],  # range of shift action (in radian)
         shared_transition=False,
         rng=None,
-        num_freqs=5,  # Number of selected frequecy to make a function
         ns=0.0,  # Noise level of additive Gaussian noise
         pow=3,
         shifts=None,
         freq_fix=False,
-        freq_manual=[],
+        freq_manual=[i+1 for i in range(5)],
         freqseed=1,
         test=0,
         track_idx=False,

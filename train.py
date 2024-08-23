@@ -18,7 +18,7 @@ from module.ft_decimation import NFT
 
 def main():
     model_name = "fordebug"
-    data_name = "one_dim_cyclic"
+    data_name = "one_dim_signal"
     train_name = "baseline"
     exp_name = f"{data_name}_{model_name}_{train_name}"
 
@@ -201,7 +201,7 @@ class Trainer:
         self.nftmodel = self.nftmodel.eval()
         evalseq, _ = self.eval_data[1]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
+        self.nftmodel.evaluate(evalseq, self.writer, device=self.device, step=self.iter)
         self.nftmodel = self.nftmodel.train()
 
 

@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 
 from einops import rearrange
 from module import dynamics as dyn
+from torch import Tensor
 
 
 class NFT(nn.Module):
@@ -37,6 +38,8 @@ class NFT(nn.Module):
         else:
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
+
+        self.freq_reconstruction_diff = []
 
     def latent_shift(self, insignal, n_rolls, mask, intervene_fxn=None):
         # determine the regressor on H0, H1
@@ -149,15 +152,15 @@ class NFT(nn.Module):
         pred = self.do_decode(latent, batch_size=batch_size)
         return pred
 
-    def evaluate(self, evalseq, writer, device):
+    def evaluate(self, evalseq, writer, device, step):
         _, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
         print("""!!! Visualization Rendered!!! """)
-        self.visualize(evalseq, predicted, writer)
+        self.visualize(evalseq, predicted, writer, step)
 
-    def visualize(self, evalseq, predicted, writer):
+    def visualize(self, evalseq, predicted, writer, step):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
         # Prediction at -1
@@ -165,8 +168,56 @@ class NFT(nn.Module):
         plt.plot(evalseq[-1], label="gt")
         plt.plot(predicted[-1], label="pred")
         plt.legend()
+        writer.add_figure("gt vs predicted", plt.gcf(), global_step=step)
 
-        writer.add_figure("gt vs predicted", plt.gcf())
+        # original signal (before lambda t: t**3)
+        evalseq_original = self.get_original_signal(evalseq[-1])
+        predicted_original = self.get_original_signal(predicted[-1])
+
+        plt.figure(figsize=(20, 10))
+        plt.plot(evalseq_original, label="gt original")
+        plt.plot(predicted_original, label="pred original")
+        plt.legend()
+        writer.add_figure("original signals", plt.gcf(), global_step=step)
+
+        # freqs = 1, ..., 5
+        eval_ft = torch.fft.fft(evalseq_original)[1:6]
+        pred_ft = torch.fft.fft(predicted_original)[1:6]
+        plt.figure(figsize=(20, 10))
+        plt.plot(torch.abs(eval_ft), label="gt fft")
+        plt.plot(torch.abs(pred_ft), label="pred fft")
+        plt.legend()
+        writer.add_figure("fft", plt.gcf(), global_step=step)
+
+        self.freq_reconstruction_diff.append(abs((pred_ft-eval_ft)/eval_ft))
+        plt.figure(figsize=(20, 10))
+        for i in range(5):
+            ith_ratio = torch.stack([ratio[i] for ratio in self.freq_reconstruction_diff])
+            plt.plot(ith_ratio, label=f"freq {i + 1}")
+        plt.legend()
+        writer.add_figure("freq diff", plt.gcf(), global_step=step)
+
+    def get_original_signal(self, signal: Tensor) -> Tensor:
+        assert signal.ndim == 1
+        N = signal.shape[0]
+        signal = signal.tolist()
+        original_signal = []
+        for l in range(N):
+            for k in range(N - 1):
+                if (k / N) ** 3 <= l / N < ((k + 1) / N) ** 3:
+                    k = k
+                    a = l / N - (k / N) ** 3
+                    b = ((k + 1) / N) ** 3 - l / N
+                    original_signal.append(
+                        (b * signal[k + 1] + a * signal[k]) / (a + b)
+                    )
+                    break
+            else:
+                k = N - 1
+                a = l / N - (k / N) ** 3
+                b = 1 - l / N
+                original_signal.append((b * signal[0] + a * signal[k]) / (a + b))
+        return torch.Tensor(original_signal)
 
 
 class DFNFT(NFT):

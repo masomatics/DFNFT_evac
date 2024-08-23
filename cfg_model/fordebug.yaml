@@ -11,7 +11,7 @@ modelargs:
   dim_m: 10
   dim_a: 16
   depth: 3
-  hidden_dim: 260
+  hidden_dim: 300
   predictive: True
   transition_model: LS
   activation: tanh
