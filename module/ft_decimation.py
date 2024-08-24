@@ -87,8 +87,11 @@ class NFT(nn.Module):
 
         return predicted
 
-    def shift_latent(self, latent, n_rolls=1, mask=None):
-        # determine the regressor on H0, H1
+    def shift_latent(self, latent, n_rolls=1, mask=None, noise=0):
+        # determine the regressor on H0, H1,  adding noise to H1 when deemed necessary
+        noise_placeholder = torch.zeros_like(latent).to(latent.device)
+        noise_placeholder[:, 1] = noise
+        latent = latent + noise_placeholder
         self.dynamics._compute_M(latent[:, :2], mask, orth_proj=self.orth_proj)
         # print(self.dynamics.M[0, 0], "FOR Debug M")
         latent_preds = [latent[:, [0]], latent[:, [1]]]
@@ -128,16 +131,16 @@ class NFT(nn.Module):
         pred = self.do_decode(latent, batchsize=batchsize)
         return pred
 
-    def evaluate(self, evalseq, writer, device):
+    def evaluate(self, evalseq, writer, device, step):
         b, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted, _, _ = self(initialpair, n_rolls=rolllength)
         predicted = predicted.detach()
         print("""!!! Visualization Rendered!!! """)
-        self.visualize(evalseq, predicted, writer)
+        self.visualize(evalseq, predicted, writer, step)
 
-    def visualize(self, evalseq, predicted, writer):
+    def visualize(self, evalseq, predicted, writer, step):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
         # Prediction at -1
@@ -146,11 +149,11 @@ class NFT(nn.Module):
         plt.plot(predicted[-1], label="pred")
         plt.legend()
 
-        writer.add_figure("gt vs predicted", plt.gcf())
+        writer.add_figure("gt vs predicted", plt.gcf(), global_step=step)
 
 
 class DFNFT(NFT):
-    def __init__(self, nftlist: list[NFT], owndecoders: list):
+    def __init__(self, nftlist: list[NFT], owndecoders: list, **kwargs):
         super().__init__(encoder=None, decoder=None)
         self.owndecoders = nn.ModuleList(owndecoders)
         self.nftlayers = nn.ModuleList(nftlist)
@@ -183,9 +186,17 @@ class DFNFT(NFT):
 
     def intermediate_decode(self, kth_latent, layer_idx_from_bottom=0):
         # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
-        kplus1th_latent = self.nftlayers[
-            (self.depth - 1) - layer_idx_from_bottom
-        ].do_decode(kth_latent)
+        batchsize = kth_latent.shape[0]
+        kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
+        kth_latent = self.owndecoders[(self.depth - 1) - layer_idx_from_bottom](
+            kth_latent
+        )
+        kplus1th_latent = rearrange(kth_latent, "(n t) ... -> n t ...", n=batchsize)
+
+        ##### EXPERIMENTALLLLLL!!!!!!
+        # kplus1th_latent = self.nftlayers[
+        #     (self.depth - 1) - layer_idx_from_bottom
+        # ].do_decode(kth_latent)
         return kplus1th_latent
 
     def __call__(self, obs, n_rolls=1):
@@ -201,21 +212,31 @@ class DFNFT(NFT):
             # Use the next mask
             maskidx = min(self.depth - 1, k + 1)
             mask_k = self.nftlayers[maskidx].encoder.maskmat
+            """
+            EXPERIMENTAL!!!!  Adding NOISE TO LATENT TO BE REGRESSED WHEN NOT at BOTTOM!  FROM HERE
+            """
+            noise = torch.normal(
+                mean=torch.zeros(size=latent[:, 1].shape), std=0.0 * (k == 0)
+            ).to(latent.device)
+            noise.requires_grad = False
             latent_pred = self.nftlayers[k].shift_latent(
-                latent, n_rolls=n_rolls, mask=mask_k
+                latent, n_rolls=n_rolls, mask=mask_k, noise=noise
             )
             latent_preds.append(latent_pred)
+            """
+            EXPERIMENTAL!!!!  FROM HERE
+            """
 
-        intermediate_preds = []
+        intermediate_obs_preds = []
         for k in range(1, self.depth):
             kplus1latent_pred = self.intermediate_decode(
                 latent_preds[k], layer_idx_from_bottom=k
             )
-            intermediate_preds.append(kplus1latent_pred)
+            intermediate_obs_preds.append(kplus1latent_pred)
 
         infer_pred = self.do_decode(latent_preds[-1])
 
-        return infer_pred, latent_preds, intermediate_preds
+        return infer_pred, latent_preds, intermediate_obs_preds
 
     def lossfxn(self, target, pred):
         errval = torch.mean(
@@ -240,19 +261,32 @@ class DFNFT(NFT):
             if k == self.depth - 1:
                 predloss = self.lossfxn(obstuple, predfuture)
             else:
+                intermediate_loss = intermediate_loss + self.lossfxn(
+                    targets[k], intermediate_preds[k]
+                )
+                # EXPERIMENTAL. Making as many M0 as possible to Eye by Lasso Loss
+                LassoStrength = 0.1
+                intermediate_strength = 2.0
+                eyes = torch.eye(self.nftlayers[0].dynamics.M.shape[-1])[None, :]
+                eyes = eyes.to(self.nftlayers[0].dynamics.M.device)
+                matrixL0DeltaNorms = torch.sum(
+                    (self.nftlayers[0].dynamics.M - eyes) ** 2, axis=[-1, -2]
+                )
+                Lassoloss = torch.mean(matrixL0DeltaNorms)
+                intermediate_loss = intermediate_strength * (
+                    intermediate_loss + LassoStrength * Lassoloss
+                )
+
                 # noise (EXPERIMENTAL)
                 # intermediate_loss = self.lossfxn(
                 #     torch.mean(latent_preds[0], axis=-1, keepdims=True), latent_preds[0]
                 # )
-                # ep = torch.normal(mean=torch.zeros(size=targets[k].shape), std=0.0).to(
-                #     targets[k].device
-                # )
-                intermediate_loss = intermediate_loss + self.lossfxn(
-                    targets[k], intermediate_preds[k]
-                )
                 # intermediate_loss = intermediate_loss + self.lossfxn(
                 #     torch.mean(targets[k], axis=-1, keepdims=True),
                 #     intermediate_preds[k],
+                # )
+                # ep = torch.normal(mean=torch.zeros(size=targets[k].shape), std=5.0).to(
+                #     targets[k].device
                 # )
                 # intermediate_loss = intermediate_loss + self.lossfxn(
                 #     targets[k] + ep, intermediate_preds[k]

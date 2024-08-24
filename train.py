@@ -15,14 +15,16 @@ import numpy as np
 from module import ft_decimation as ftd
 import pdb
 from misc import yaml_util as yu
+from misc import spectrum_evaluate as sev
 # from module import ft_module_from_dimside as ftdim
 
 
 def main():
     # modename
-    modelname = "mask2Stacklayer"
+    modelname = "Trial_OwnDecoder"
     # modelname = "fordebug"
-    datname = "OneDsignal_c8mimic"
+    # datname = "OneDsignal_c8mimic"
+    datname = "OneDsignal_OddEven"
     # datname = "OneDCyclic"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -43,7 +45,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 3
+    configs["train"]["device"] = 4
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -95,9 +97,32 @@ class DF_Trainer(object):
         )
 
     def _set_optimizer(self):
-        self.optimizer = torch.optim.Adam(
-            self.nftmodel.parameters(), lr=self.lr, weight_decay=0.001
-        )
+        if True:
+            self.optimizer = torch.optim.Adam(
+                self.nftmodel.parameters(), lr=self.lr, weight_decay=0.001
+            )
+        else:
+            print("LR / WEIGHT DECAY EXPERIMENT ACTIVATED!!!!!!" * 10)
+            layer0speed = 0.1
+            self.optimizer = torch.optim.Adam(
+                [
+                    {
+                        "params": self.nftmodel.nftlayers[0].parameters(),
+                        "lr": self.lr * layer0speed,
+                        "weight_decay": 0.001,
+                    },
+                    {
+                        "params": self.nftmodel.nftlayers[1].parameters(),
+                        "lr": self.lr * layer0speed,
+                        "weight_decay": 0.001,
+                    },
+                    {
+                        "params": self.nftmodel.owndecoders.parameters(),
+                        "lr": self.lr,
+                        "weight_decay": 0.001,
+                    },
+                ]
+            )
 
     def report(self, value=None, name=None):
         if self.iter % self.report_freq == 0:
@@ -132,20 +157,25 @@ class DF_Trainer(object):
         owndecs = []
         decstars = []
         nftmodels = []
-        for k in range(nft_args["depth"]):
+        self.depth = nft_args["depth"]
+        for k in range(self.depth):
             model_args_k = copy.deepcopy(model_args)
             """
             TEMPORARY TREATMENT. MASKS 
             """
-            if nft_args["depth"] == 1:
-                mask = self.create_masks(model_args_k, layer=k)
-            else:
-                mask = self.create_masks(model_args_k, layer=1)
+            mask = self.create_masks(model_args_k, layer=k)
 
             if k > 0:
                 # Se the next dim_data to be the previous latent_dim.
 
                 model_args_k["dim_data"] = nftmodels[k - 1].encoder.dim_latent
+
+            if k == 0:
+                # TEMMPORARY! EXPERIMENTAL FROM HERE
+                # model_args_k["activation"] = "id"
+                pass
+                # TEMMPORARY! EXPERIMENTAL UPTO HERE
+
             enc_k = enc_class(**model_args_k, maskmat=mask)
             dec_k = dec_class(**model_args_k, maskmat=mask)
             decStar = dec_class(**model_args_k, maskmat=mask)
@@ -160,10 +190,16 @@ class DF_Trainer(object):
             )
             nftmodels.append(nftmodel)
         if "nftlayer" in nft_args.keys():
-            self.nftmodel = dfnft_class(nftlist=nftmodels, owndecoders=decstars)
+            self.nftmodel = dfnft_class(
+                nftlist=nftmodels,
+                owndecoders=decstars,
+            )
+            # self.nftmodel = dfnft_class(
+            #     nftlist=nftmodels, owndecoders=decstars, **nft_args["experiment"]
+            # )
+
         else:
             self.nftmodel = nftmodel
-
         self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         self.configs["data"]["args"]["T"] = self.trainT
 
@@ -180,10 +216,17 @@ class DF_Trainer(object):
         return mask
 
     def train(self):
-        self.nftmodel.train().to(dtype=self.dtype).to(self.device)
+        self.nftmodel = self.nftmodel.to(dtype=self.dtype).to(self.device)
+
         loader_iter = cycle(self.loader)
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
+
+            if self.iter % 1000 == 0:
+                sev.spectrum(
+                    self.nftmodel, self.loader, self.writer, iteridx, self.device
+                )
+
             [seqs, label] = next(loader_iter)
             seqs = seqs.to(dtype=self.dtype).to(self.device)
             # print(f"""Debug label is {label}""")
@@ -217,7 +260,8 @@ class DF_Trainer(object):
                 self.report(value=loss_metrics[key], name=key)
 
             if self.iter % self.save_freq == 0:
-                print(loss_metrics["all_loss"])
+                # print(loss_metrics["all_loss"])
+                print(loss_metrics)
                 try:
                     torch.save(self.nftmodel, f"""{self.writerlocation}/model.pt""")
                 except:
@@ -226,14 +270,14 @@ class DF_Trainer(object):
                         self.nftmodel.state_dict(), f"{self.writerlocation}/model.pt"
                     )
                 print(f"""Model saved at {self.writerlocation}/model.pt""")
-                self.evaluate()
+                self.evaluate(step=iteridx)
                 print(f"""Model evaluated""")
 
-    def evaluate(self):
+    def evaluate(self, step):
         self.nftmodel = self.nftmodel.eval()
         evalseq, label = self.eval_data[1]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
+        self.nftmodel.evaluate(evalseq, self.writer, device=self.device, step=step)
         self.nftmodel = self.nftmodel.train()
 
 

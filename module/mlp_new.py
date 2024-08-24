@@ -74,10 +74,7 @@ class MLP_AE(nn.Module):
         self.hidden_dim = hidden_dim
         self.require_input_adapter = require_input_adapter
         self.dim_latent = self.dim_m * self.dim_a
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda", gpu_id)
-        else:
-            self.device = torch.device("cpu")
+
         if activation == "relu":
             self.activation_fxn = nn.ReLU()
         elif activation == "tanh":
@@ -88,6 +85,10 @@ class MLP_AE(nn.Module):
             self.activation_fxn = nn.Identity()
         else:
             raise NotImplementedError
+
+    @property
+    def device(self):
+        return next(self.parameters()).device if self.parameters() else None
 
 
 class MLPEncoder(MLP_AE):

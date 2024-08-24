@@ -1,0 +1,34 @@
+#FOr Temporary File managing for Temporary Trial , RUN THIS ONLY WITH Intermediate_Decode Prototype
+encmodel:
+  fn: ./module/mlp_new
+  name: MLPEncoder
+
+decmodel:
+  fn: ./module/mlp_new
+  name: MLPDecoder
+
+modelargs:
+  dim_data: 128
+  dim_m: 12
+  dim_a: 12
+  depth: 1
+  hidden_dim: 128
+  predictive: True
+  transition_model: LS
+  activation: tanh
+
+nftmodel: 
+  fn: ./module/ft_decimation
+  name: DFNFT
+
+nftargs:
+  orth_proj: True
+  depth: 1
+  is_Dimside: False
+  nftlayer: 
+    fn: ./module/ft_decimation
+    name: NFT
+  experiment:
+    intermediate_with_own_decoder: True
+    firstlayer_strength : 2.0
+    lasso_strength: 1.0
