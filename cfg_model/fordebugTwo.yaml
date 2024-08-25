@@ -81,7 +81,6 @@ nftmodel:
 nftargs:
   orth_proj: True
   depth: 2
-  ownDec: False
   is_Dimside: False
   nftlayer: 
     fn: ./module/ft_decimation
@@ -89,3 +88,4 @@ nftargs:
 
 
 
+/

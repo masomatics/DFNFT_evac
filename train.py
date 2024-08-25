@@ -20,11 +20,13 @@ from misc import spectrum_evaluate as sev
 
 
 def main():
+    # FOR DEBUG, use OneDsignal_OddEven + debug
+
     # modename
-    modelname = "Trial_OwnDecoder"
+    modelname = "Trial_OwnDecoder_sparse"
     # modelname = "fordebug"
     # datname = "OneDsignal_c8mimic"
-    datname = "OneDsignal_OddEven"
+    datname = "OneDsignal_OddEvenTwo"
     # datname = "OneDCyclic"
     trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
@@ -45,7 +47,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 4
+    configs["train"]["device"] = 6
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -157,6 +159,12 @@ class DF_Trainer(object):
         owndecs = []
         decstars = []
         nftmodels = []
+
+        if "experimental" in nft_args.keys():
+            experimental_args = nft_args["experimental"]
+        else:
+            experimental_args = {}
+
         self.depth = nft_args["depth"]
         for k in range(self.depth):
             model_args_k = copy.deepcopy(model_args)
@@ -193,6 +201,7 @@ class DF_Trainer(object):
             self.nftmodel = dfnft_class(
                 nftlist=nftmodels,
                 owndecoders=decstars,
+                **experimental_args,
             )
             # self.nftmodel = dfnft_class(
             #     nftlist=nftmodels, owndecoders=decstars, **nft_args["experiment"]
@@ -255,6 +264,9 @@ class DF_Trainer(object):
                 "predloss": predloss,
                 "intermediate": intermediate,
             }
+
+            if self.debug == True:
+                print(f"""{self.iter}: {loss_metrics}""")
 
             for key in loss_metrics.keys():
                 self.report(value=loss_metrics[key], name=key)

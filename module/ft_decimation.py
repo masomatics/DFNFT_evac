@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 
 from einops import rearrange, repeat, einsum
 from misc import orthog_proj as op
+from misc import loss_helper as lh
 import pdb
 from module import dynamics as dyn
 
@@ -148,8 +149,18 @@ class NFT(nn.Module):
         plt.plot(evalseq[-1], label="gt")
         plt.plot(predicted[-1], label="pred")
         plt.legend()
+        writer.add_figure(
+            f"""gt vs predicted t={len(evalseq)}""", plt.gcf(), global_step=step
+        )
 
-        writer.add_figure("gt vs predicted", plt.gcf(), global_step=step)
+        timeidx = 1
+        plt.figure(figsize=(20, 10))
+        plt.plot(evalseq[timeidx], label="gt")
+        plt.plot(predicted[timeidx], label="pred")
+        plt.legend()
+        writer.add_figure(
+            f"""gt vs predicted t={timeidx}""", plt.gcf(), global_step=step
+        )
 
 
 class DFNFT(NFT):
@@ -159,6 +170,12 @@ class DFNFT(NFT):
         self.nftlayers = nn.ModuleList(nftlist)
         self.depth = len(self.nftlayers)
         self.terminal_dynamics = nftlist[-1].dynamics
+
+        self.experimental_mode = False
+        for key in kwargs:
+            self.experimental_mode = True
+            print("EXPERIMENTAL MODE ACTIVATED!" * 10)
+            setattr(self, key, kwargs[key])
 
         # Turning on the input_adapter for the first layer of NFT
         self.owndecoders.require_input_adapter = True
@@ -264,14 +281,27 @@ class DFNFT(NFT):
                 intermediate_loss = intermediate_loss + self.lossfxn(
                     targets[k], intermediate_preds[k]
                 )
-                # EXPERIMENTAL. Making as many M0 as possible to Eye by Lasso Loss
-                LassoStrength = 0.1
-                intermediate_strength = 2.0
+            # EXPERIMENTAL. Making as many M0 as possible to Eye by Lasso Loss
+            if self.experimental_mode == True and k == 0:
+                LassoStrength = self.lasso_strength
+                intermediate_strength = self.intermediate_strength
                 eyes = torch.eye(self.nftlayers[0].dynamics.M.shape[-1])[None, :]
                 eyes = eyes.to(self.nftlayers[0].dynamics.M.device)
-                matrixL0DeltaNorms = torch.sum(
-                    (self.nftlayers[0].dynamics.M - eyes) ** 2, axis=[-1, -2]
-                )
+                if hasattr(self, "use_mean") and self.use_mean == True:
+                    meanMat = torch.mean(
+                        self.nftlayers[0].dynamics.M, axis=0, keepdim=True
+                    )
+                    matrixL0DeltaNorms = torch.sum(
+                        (self.nftlayers[0].dynamics.M - meanMat) ** 2, axis=[-1, -2]
+                    )
+                elif hasattr(self, "use_delta") and self.use_delta == True:
+                    matrixL0DeltaNorms = lh.tensors_sparseloss(
+                        self.nftlayers[0].dynamics.M
+                    )
+                else:
+                    matrixL0DeltaNorms = torch.sum(
+                        (self.nftlayers[0].dynamics.M - eyes) ** 2, axis=[-1, -2]
+                    )
                 Lassoloss = torch.mean(matrixL0DeltaNorms)
                 intermediate_loss = intermediate_strength * (
                     intermediate_loss + LassoStrength * Lassoloss

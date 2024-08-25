@@ -12,6 +12,7 @@ sys.path.append("./module")
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from misc import character_analysis as ca
+from misc import loss_helper as lh
 import pdb
 import copy
 
@@ -59,79 +60,122 @@ def spectrum(mymodel, myloader, mywriter, step, device):
     mydata = myloader.dataset
     Ms = {0: [], 1: []}
     shifts = []
-    for k in range(10):
-        evalseq, shift = next(iter(myloader))
-        evalseq = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
-        predicted = mymodel(evalseq, n_rolls=1)
-        shifts.append(shift)
-        Ms[0].append(mymodel.nftlayers[0].dynamics.M)
-        Ms[1].append(mymodel.nftlayers[1].dynamics.M)
 
-    shifts = torch.concatenate(shifts)
-    Ms[0] = torch.concatenate(Ms[0]).detach()
-    Ms[1] = torch.concatenate(Ms[1]).detach()
-    print(Ms[0].shape)
-    Mup = replace_lowhalf(Ms[1].to("cpu"))
-    Mbot = replace_uphalf(Ms[1].to("cpu"))
+    if mymodel.depth > 1:
+        for k in range(10):
+            evalseq, shift = next(iter(myloader))
+            evalseq = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
+            predicted = mymodel(evalseq, n_rolls=1)
+            shifts.append(shift)
+            Ms[0].append(mymodel.nftlayers[0].dynamics.M)
+            Ms[1].append(mymodel.nftlayers[1].dynamics.M)
 
-    myfreqs = np.array(mydata.freqsel)
-    maxfreq = np.max(myfreqs)
+        shifts = torch.concatenate(shifts)
+        Ms[0] = torch.concatenate(Ms[0]).detach()
+        Ms[1] = torch.concatenate(Ms[1]).detach()
+        print(Ms[0].shape)
+        Mup = replace_lowhalf(Ms[1].to("cpu"))
+        Mbot = replace_uphalf(Ms[1].to("cpu"))
 
-    targfreq, prods0 = ca.inner_prod(
-        Ms[0].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
-    )
-    targfreq, prods1 = ca.inner_prod(
-        Ms[1].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
-    )
-    targfreq, prodsUp = ca.inner_prod(
-        Mup.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
-    )
-    targfreq, prodsBot = ca.inner_prod(
-        Mbot.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
-    )
+        myfreqs = np.array(mydata.freqsel)
+        maxfreq = np.max(myfreqs)
+
+        targfreq, prods0 = ca.inner_prod(
+            Ms[0].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prods1 = ca.inner_prod(
+            Ms[1].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prodsUp = ca.inner_prod(
+            Mup.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prodsBot = ca.inner_prod(
+            Mbot.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+
+        plt.figure()
+        deltas = ca.deltafxn(targfreq, mydata.freqsel) * 2
+        plt.plot(
+            targfreq, deltas, alpha=0.2, label="gt:" + str(np.where(deltas > 1.0)[0])
+        )
+        plt.plot(
+            targfreq,
+            prods0,
+            label="pred0:" + str(np.where(prods0 > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.plot(
+            targfreq,
+            prods1,
+            label="pred1:" + str(np.where(prods1 > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.legend()
+        plt.title(str(np.sort(myfreqs)) + current_date)
+
+        mywriter.add_figure("P0 vs P1", plt.gcf(), global_step=step)
+
+        # plt_image = plot_to_image(plt)
+        # # Log the image to TensorBoard
+        # mywriter.add_image("P0 vs P1", plt_image, global_step=step, dataformats="HWC")
+
+        plt.figure()
+        plt.plot(targfreq, deltas, label="gt", alpha=0.2)
+        plt.plot(
+            targfreq,
+            prodsUp,
+            label="predUP:" + str(np.where(prodsUp > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.plot(
+            targfreq,
+            prodsBot,
+            label="predBot:" + str(np.where(prodsBot > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.legend()
+        plt.title(str(np.sort(myfreqs)) + current_date)
+
+        mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
+
+    else:
+        for k in range(10):
+            evalseq, shift = next(iter(myloader))
+            evalseq = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
+            predicted = mymodel(evalseq, n_rolls=1)
+            shifts.append(shift)
+            Ms[0].append(mymodel.nftlayers[0].dynamics.M)
+
+        shifts = torch.concatenate(shifts)
+        Ms[0] = torch.concatenate(Ms[0]).detach()
+
+        myfreqs = np.array(mydata.freqsel)
+        maxfreq = np.max(myfreqs)
+
+        targfreq, prods0 = ca.inner_prod(
+            Ms[0].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+
+        plt.figure()
+        deltas = ca.deltafxn(targfreq, mydata.freqsel) * 2
+        plt.plot(
+            targfreq, deltas, alpha=0.2, label="gt:" + str(np.where(deltas > 1.0)[0])
+        )
+        targfreq, prods0 = ca.inner_prod(
+            Ms[0].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        plt.plot(
+            targfreq,
+            prods0,
+            label="pred0:" + str(np.where(prods0 > 1.0)[0]),
+            alpha=0.8,
+        )
+        mywriter.add_figure("P0 vs GT", plt.gcf(), global_step=step)
 
     plt.figure()
-    deltas = ca.deltafxn(targfreq, mydata.freqsel) * 2
-    plt.plot(targfreq, deltas, alpha=0.2, label="gt:" + str(np.where(deltas > 1.0)[0]))
-    plt.plot(
-        targfreq,
-        prods0,
-        label="pred0:" + str(np.where(prods0 > 1.0)[0]),
-        alpha=0.8,
-    )
-    plt.plot(
-        targfreq,
-        prods1,
-        label="pred1:" + str(np.where(prods1 > 1.0)[0]),
-        alpha=0.8,
-    )
-    plt.legend()
-    plt.title(str(np.sort(myfreqs)) + current_date)
-
-    mywriter.add_figure("P0 vs P1", plt.gcf(), global_step=step)
-
-    # plt_image = plot_to_image(plt)
-    # # Log the image to TensorBoard
-    # mywriter.add_image("P0 vs P1", plt_image, global_step=step, dataformats="HWC")
-
-    plt.figure()
-    plt.plot(targfreq, deltas, label="gt", alpha=0.2)
-    plt.plot(
-        targfreq,
-        prodsUp,
-        label="predUP:" + str(np.where(prodsUp > 1.0)[0]),
-        alpha=0.8,
-    )
-    plt.plot(
-        targfreq,
-        prodsBot,
-        label="predBot:" + str(np.where(prodsBot > 1.0)[0]),
-        alpha=0.8,
-    )
-    plt.legend()
-    plt.title(str(np.sort(myfreqs)) + current_date)
-
-    mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
+    matrixL0DeltaNorms = lh.tensors_sparseloss(mymodel.nftlayers[0].dynamics.M)
+    plt.imshow(matrixL0DeltaNorms.to("cpu").detach())
+    mywriter.add_figure("Matrix Variety, Batch x Batch", plt.gcf(), global_step=step)
 
     # plt_image = plot_to_image(plt)
     # # Log the image to TensorBoard

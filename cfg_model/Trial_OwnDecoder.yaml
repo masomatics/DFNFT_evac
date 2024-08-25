@@ -28,3 +28,6 @@ nftargs:
   nftlayer: 
     fn: ./module/ft_decimation
     name: NFT
+  experimental:
+    lasso_strength: 0.1
+    intermediate_strength: 2.0

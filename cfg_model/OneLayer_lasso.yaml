@@ -1,4 +1,4 @@
-#FOr Temporary File managing for Temporary Trial , RUN THIS ONLY WITH Intermediate_Decode Prototype
+#FOr Temporary File managing for Temporary Trial , RUN THIS ONLY WITH Intermediate_Decode
 encmodel:
   fn: ./module/mlp_new
   name: MLPEncoder
@@ -28,7 +28,7 @@ nftargs:
   nftlayer: 
     fn: ./module/ft_decimation
     name: NFT
-  experiment:
-    intermediate_with_own_decoder: True
-    firstlayer_strength : 2.0
-    lasso_strength: 1.0
+  experimental:
+    lasso_strength: 5.0
+    intermediate_strength: 1.0
+    use_delta: True
