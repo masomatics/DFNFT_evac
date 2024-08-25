@@ -30,5 +30,5 @@ nftargs:
     name: NFT
   experimental:
     lasso_strength: 0.5
-    intermediate_strength: 2.0
+    intermediate_strength: 4.0
     use_delta: True

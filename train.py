@@ -20,15 +20,15 @@ from misc import spectrum_evaluate as sev
 
 
 def main():
-    # FOR DEBUG, use OneDsignal_OddEven + debug
+    # FOR DEBUG, use Trial_OwnDecoder, OneDsignal_OddEven + debug
 
     # modename
-    modelname = "Trial_OwnDecoder_sparse"
+    modelname = "Trial_OwnDecoder"
     # modelname = "fordebug"
     # datname = "OneDsignal_c8mimic"
-    datname = "OneDsignal_OddEvenTwo"
+    datname = "OneDsignal_OddEven"
     # datname = "OneDCyclic"
-    trainname = "baseline"
+    trainname = "debug"
     mode = "_".join([datname, modelname, trainname])
 
     with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
@@ -47,7 +47,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 6
+    configs["train"]["device"] = 4
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -67,7 +67,19 @@ class DF_Trainer(object):
 
         self.writerlocation = "./dnftresult/vanillaX"
         self._set_train()
-        self._set_models()
+
+        if "reload" in self.configs["model"].keys():
+            expname = self.configs["model"]["reload"]
+            exppath = os.path.join("./dnftresult", expname)
+            if not os.path.exists(exppath):
+                raise NotImplementedError
+            mymodelpath = f"""{exppath}/model.pt"""
+            self.nftmodel = torch.load(mymodelpath)
+            print(f"""Begin restarting from the model of {mymodelpath}. """)
+            print("WARNING : We ARE RELOADING A MODEL" * 10)
+            self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
+        else:
+            self._set_models()
         self._set_data()
         self._set_loader()
         self._set_optimizer()
@@ -172,6 +184,7 @@ class DF_Trainer(object):
             TEMPORARY TREATMENT. MASKS 
             """
             mask = self.create_masks(model_args_k, layer=k)
+            dynamic_mask = self.create_masks(model_args_k, layer=1)
 
             if k > 0:
                 # Se the next dim_data to be the previous latent_dim.
@@ -194,6 +207,7 @@ class DF_Trainer(object):
                 decoder=dec_k,
                 require_input_adapter=k == 0,
                 owndecs=owndecs,
+                dynamics_mask=dynamic_mask,
                 **nft_args,
             )
             nftmodels.append(nftmodel)
@@ -247,7 +261,6 @@ class DF_Trainer(object):
             n, t = seqs.shape[:2]
             trainT = self.trainT
             trainseqs = seqs[:, :trainT]
-
             rollnum = trainT - 1
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)

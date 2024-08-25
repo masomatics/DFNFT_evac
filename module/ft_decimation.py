@@ -22,6 +22,7 @@ class NFT(nn.Module):
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
+        dynamics_mask=None,
         **kwargs,
     ):
         super().__init__()
@@ -32,12 +33,14 @@ class NFT(nn.Module):
             self.encoder.require_input_adapter = self.require_input_adapter
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
+            self.device = self.encoder.device
 
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
+        self.dynamics_mask = dynamics_mask
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, embed=None):
@@ -170,6 +173,7 @@ class DFNFT(NFT):
         self.nftlayers = nn.ModuleList(nftlist)
         self.depth = len(self.nftlayers)
         self.terminal_dynamics = nftlist[-1].dynamics
+        self.device = self.nftlayers[0].device
 
         self.experimental_mode = False
         for key in kwargs:
@@ -232,6 +236,12 @@ class DFNFT(NFT):
             """
             EXPERIMENTAL!!!!  Adding NOISE TO LATENT TO BE REGRESSED WHEN NOT at BOTTOM!  FROM HERE
             """
+            if (
+                hasattr(self, "use_zero_layer_mask")
+                and self.use_zero_layer_mask == True
+            ):
+                mask_k = self.nftlayers[-1].dynamics_mask.to(latent.device)
+
             noise = torch.normal(
                 mean=torch.zeros(size=latent[:, 1].shape), std=0.0 * (k == 0)
             ).to(latent.device)

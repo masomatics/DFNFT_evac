@@ -172,10 +172,54 @@ def spectrum(mymodel, myloader, mywriter, step, device):
         )
         mywriter.add_figure("P0 vs GT", plt.gcf(), global_step=step)
 
+        Mup = replace_lowhalf(Ms[0].detach().to("cpu"))
+        Mbot = replace_uphalf(Ms[0].detach().to("cpu"))
+        targfreq, prodsUp = ca.inner_prod(
+            Mup.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prodsBot = ca.inner_prod(
+            Mbot.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prodsUp = ca.inner_prod(
+            Mup.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        targfreq, prodsBot = ca.inner_prod(
+            Mbot.to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+
+        plt.figure()
+        plt.plot(targfreq, deltas, label="gt", alpha=0.2)
+        plt.plot(
+            targfreq,
+            prodsUp,
+            label="predUP:" + str(np.where(prodsUp > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.plot(
+            targfreq,
+            prodsBot,
+            label="predBot:" + str(np.where(prodsBot > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.legend()
+        plt.title(str(np.sort(myfreqs)) + current_date)
+
+        mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
+
     plt.figure()
     matrixL0DeltaNorms = lh.tensors_sparseloss(mymodel.nftlayers[0].dynamics.M)
     plt.imshow(matrixL0DeltaNorms.to("cpu").detach())
     mywriter.add_figure("Matrix Variety, Batch x Batch", plt.gcf(), global_step=step)
+
+    for layer in range(len(mymodel.nftlayers)):
+        plt.figure()
+        matrixMeanshape = torch.mean(
+            torch.abs(mymodel.nftlayers[layer].dynamics.M.detach()), axis=0
+        )
+        plt.imshow(matrixMeanshape.to("cpu"))
+        mywriter.add_figure(
+            f""" Matrix Meanshape {[layer]}""", plt.gcf(), global_step=step
+        )
 
     # plt_image = plot_to_image(plt)
     # # Log the image to TensorBoard
