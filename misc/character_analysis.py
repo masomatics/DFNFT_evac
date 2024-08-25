@@ -53,7 +53,7 @@ def inner_prod(rholist, gs, maxfreq=20, bins=50):
         inner_prod_vals = torch.stack(inner_prod_vals)
         character_prod.append(torch.mean(inner_prod_vals).item())
 
-    character_prod = torch.tensor(character_prod)
+    character_prod = torch.abs(torch.tensor(character_prod))
     return (targfreqs, character_prod)
 
 

@@ -26,6 +26,7 @@ class NFT(nn.Module):
         **kwargs,
     ):
         super().__init__()
+        self.depth = 1
         self.is_Dimside = is_Dimside
         if encoder is not None:
             self.require_input_adapter = require_input_adapter
@@ -272,8 +273,8 @@ class DFNFT(NFT):
         return errval
 
     def loss(self, obstuple, n_rolls=1):
-        predinput = obstuple[:, :-1]  # X0 X1
-
+        # predinput = obstuple[:, :-1]  # X0 X1   <--Call uses 0 and 1, this is unncessary
+        predinput = obstuple[:, :2]
         # With the understanding that Z0 = Phi_0(X), Z^{-1} = X,
         # Xhat(t+1),   [Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth}(t+1)] ,
         # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]

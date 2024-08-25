@@ -22,13 +22,17 @@ from misc import spectrum_evaluate as sev
 def main():
     # FOR DEBUG, use Trial_OwnDecoder, OneDsignal_OddEven + debug
 
-    # modename
-    modelname = "Trial_OwnDecoder"
+    # modelname = "Trial_OwnDecoder"
+    # datname = "OneDsignal_OddEven"
+    # trainname = "debug"
+
+    modelname = "mask1layer"
+    # modelname = "OneLayer_lasso"
     # modelname = "fordebug"
     # datname = "OneDsignal_c8mimic"
     datname = "OneDsignal_OddEven"
     # datname = "OneDCyclic"
-    trainname = "debug"
+    trainname = "baseline"
     mode = "_".join([datname, modelname, trainname])
 
     with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
@@ -47,7 +51,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 4
+    configs["train"]["device"] = 6
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -80,6 +84,7 @@ class DF_Trainer(object):
             self.writerlocation = f"""./dnftresult/{self.configs['expname']}"""
         else:
             self._set_models()
+
         self._set_data()
         self._set_loader()
         self._set_optimizer()

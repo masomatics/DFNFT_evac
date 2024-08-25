@@ -6,12 +6,12 @@
     T: 3
     max_T: 9
     shift_label: True
-    shift_range: 1.0
+    shift_range: 0.4
     batchM_size: 20
     nfreq: 6
     freq_fix: True
     freqseed: 1 
     smallfreqs_num: 0
     smallfreqs_strength: 0.0
-    freq_manual: [2, 6, 8, 3, 11, 9]
+    freq_manual: [2, 8, 3, 11, 9]
     pow: 5

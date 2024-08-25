@@ -15,6 +15,7 @@ from misc import character_analysis as ca
 from misc import loss_helper as lh
 import pdb
 import copy
+from module import ft_decimation as ftd
 
 import time
 
@@ -139,12 +140,16 @@ def spectrum(mymodel, myloader, mywriter, step, device):
         mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
 
     else:
+        if isinstance(mymodel, ftd.DFNFT):
+            mynft = mymodel.nftlayers[0]
+        else:
+            mynft = mymodel
         for k in range(10):
             evalseq, shift = next(iter(myloader))
-            evalseq = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
+            evalseq = evalseq[:, :2].to(mynft.encoder.device)
             predicted = mymodel(evalseq, n_rolls=1)
             shifts.append(shift)
-            Ms[0].append(mymodel.nftlayers[0].dynamics.M)
+            Ms[0].append(mynft.dynamics.M)
 
         shifts = torch.concatenate(shifts)
         Ms[0] = torch.concatenate(Ms[0]).detach()

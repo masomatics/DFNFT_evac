@@ -3,15 +3,16 @@
   args:
     Ndata: 60000
     N: 128
-    T: 5
+    T: 6
     max_T: 9
     shift_label: True
-    shift_range: 3.14
+    shift_range: 1.0
     batchM_size: 20
     nfreq: 6
+    max_shift: [0, 6.28]
     freq_fix: True
     freqseed: 1 
     smallfreqs_num: 0
     smallfreqs_strength: 0.0
-    freq_manual: [0, 2, 4, 3, 5, 7]
+    freq_manual: [0, 1, 2, 4, 3, 5]
     pow: 5
