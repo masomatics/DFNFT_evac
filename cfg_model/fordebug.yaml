@@ -8,8 +8,8 @@ decmodel:
   name: MLPDecoder
 
 modelargs:
-  dim_m: 10
-  dim_a: 16
+  dim_d: 10
+  dim_m: 16
   depth: 3
   hidden_dim: 260
   predictive: True

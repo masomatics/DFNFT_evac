@@ -144,7 +144,7 @@ class Trainer:
         print(f"Work will be saved at {self.writer_location}")
 
     def create_masks(self, model_args, layer=0):
-        matsize = model_args["dim_m"]
+        matsize = model_args["dim_d"]
         if layer == 0:
             mask = torch.ones(matsize, matsize, requires_grad=False)
         else:

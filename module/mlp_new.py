@@ -6,22 +6,22 @@ import math
 
 class MaskFlatLinear(nn.Module):
     def __init__(
-        self, dim_m: int, in_dim: int, out_dim: int, maskmat=None, initializer_range=0.1
+        self, dim_d: int, in_dim: int, out_dim: int, maskmat=None, initializer_range=0.1
     ):
         super().__init__()
 
-        self.dim_m = dim_m
+        self.dim_d = dim_d
         self.in_dim = in_dim
         self.out_dim = out_dim
-        assert self.out_dim % self.dim_m == 0
-        assert self.in_dim % self.dim_m == 0
+        assert self.out_dim % self.dim_d == 0
+        assert self.in_dim % self.dim_d == 0
 
-        self.dim_a_in = self.in_dim // self.dim_m
-        self.dim_a_out = self.out_dim // self.dim_m
+        self.dim_m_in = self.in_dim // self.dim_d
+        self.dim_m_out = self.out_dim // self.dim_d
         self.maskmat = maskmat
         self.initializer_range = initializer_range
-        self.dim_a_mask = nn.Parameter(
-            torch.ones(self.dim_a_out, self.dim_a_in), requires_grad=False
+        self.dim_m_mask = nn.Parameter(
+            torch.ones(self.dim_m_out, self.dim_m_in), requires_grad=False
         )
 
         # self.register_buffer('kronmask', kronmask)
@@ -34,7 +34,7 @@ class MaskFlatLinear(nn.Module):
 
     def forward(self, x):
         if self.maskmat is not None:
-            kronmask = torch.kron(self.maskmat, self.dim_a_mask)
+            kronmask = torch.kron(self.maskmat, self.dim_m_mask)
             weight = self.W * kronmask
         else:
             weight = self.W
@@ -46,8 +46,8 @@ class MaskFlatLinear(nn.Module):
 class MLPAE(nn.Module):
     def __init__(
         self,
-        dim_a,
         dim_m,
+        dim_d,
         depth=3,
         transition_model="LS",
         dim_data=128,
@@ -62,8 +62,8 @@ class MLPAE(nn.Module):
         no_mask=False,
     ):
         super().__init__()
-        self.dim_a = dim_a
         self.dim_m = dim_m
+        self.dim_d = dim_d
         self.depth = depth
         self.predictive = predictive
         self.dim_data = dim_data
@@ -72,7 +72,7 @@ class MLPAE(nn.Module):
         self.maskmat = nn.Parameter(maskmat, requires_grad=False)
         self.hidden_dim = hidden_dim
         self.require_input_adapter = require_input_adapter
-        self.dim_latent = self.dim_m * self.dim_a
+        self.dim_latent = self.dim_d * self.dim_m
         if torch.cuda.is_available():
             self.device = torch.device("cuda", gpu_id)
         else:
@@ -97,15 +97,15 @@ class MLPEncoder(MLPAE):
 
         dimlist = [self.hidden_dim] * (1 + self.depth)
         # This part differs from DecBase
-        if (self.dim_data % self.dim_m) != 0:
-            middledim = int(math.ceil(self.dim_data / self.dim_m) * self.dim_m)
+        if (self.dim_data % self.dim_d) != 0:
+            middledim = int(math.ceil(self.dim_data / self.dim_d) * self.dim_d)
             modseq.append(nn.Linear(self.dim_data, middledim))
             dimlist[0] = middledim
         else:
             dimlist[0] = self.dim_data
         dimlist[-1] = self.dim_latent
         for k in range(1, 1 + self.depth):
-            if self.no_mask or self.dim_m == 0:
+            if self.no_mask or self.dim_d == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
@@ -114,7 +114,7 @@ class MLPEncoder(MLPAE):
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
                         maskmat=self.maskmat,
-                        dim_m=self.dim_m,
+                        dim_d=self.dim_d,
                     )
                 )
 
@@ -127,7 +127,7 @@ class MLPEncoder(MLPAE):
         if not self.require_input_adapter:
             xs = rearrange(xs, "... d m -> ... (d m)")
         H = self.net(xs)
-        H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
+        H = torch.reshape(H, (H.shape[0], self.dim_d, self.dim_m))
         return H
 
 
@@ -137,8 +137,8 @@ class MLPDecoder(MLPAE):
         dimlist = [self.hidden_dim] * (1 + self.depth)
         # This part differs from EncBase
         # dimlist[-1] = self.dim_data
-        if (self.dim_data % self.dim_m) != 0:
-            middledim = int(math.ceil(self.dim_data / self.dim_m) * self.dim_m)
+        if (self.dim_data % self.dim_d) != 0:
+            middledim = int(math.ceil(self.dim_data / self.dim_d) * self.dim_d)
             dimlist[-1] = middledim
         else:
             dimlist[-1] = self.dim_data
@@ -146,7 +146,7 @@ class MLPDecoder(MLPAE):
         dimlist[0] = self.dim_latent
         modseq = nn.ModuleList()
         for k in range(1, 1 + self.depth):
-            if self.no_mask or self.dim_m == 0:
+            if self.no_mask or self.dim_d == 0:
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(
@@ -154,14 +154,14 @@ class MLPDecoder(MLPAE):
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
                         maskmat=self.maskmat,
-                        dim_m=self.dim_m,
+                        dim_d=self.dim_d,
                     )
                 )
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
 
             if k < self.depth:
                 modseq.append(self.activation_fxn)
-        if (self.dim_data % self.dim_m) != 0:
+        if (self.dim_data % self.dim_d) != 0:
             modseq.append(nn.Linear(middledim, self.dim_data))
 
         self.net = nn.Sequential(*modseq)
