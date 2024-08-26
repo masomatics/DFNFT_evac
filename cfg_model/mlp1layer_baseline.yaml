@@ -16,7 +16,7 @@ modelargs:
   activation: tanh
   no_mask: True
 
-nftmodel: 
+nft_model: 
   fn: ./module/ft_decimation
   name: NFT
 

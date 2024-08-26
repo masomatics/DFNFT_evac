@@ -15,7 +15,7 @@ class CyclicGroupSignal(Dataset):
         num_shifts: int,
         num_freqs: int,
         diffeo_of_circle: Callable[[float], float] = lambda t: t**3,
-        group_param: tuple[int, int] = (2, 7),
+        group_param: tuple[int, int] = (2, 11),
         shift_label: bool = False,
     ) -> None:
         self.num_data = num_data
@@ -30,7 +30,7 @@ class CyclicGroupSignal(Dataset):
         random.seed(0)
         np.random.seed(0)
 
-        self.fixed_freqs = np.array([0, 1, 2, 3])
+        self.fixed_freqs = np.array([1, 2, 3, 5, 7])
         # np.array(
         #     random.sample(range(self.group_order // 2), num_freqs)
         # )

@@ -15,7 +15,7 @@ modelargs:
   transition_model: LS
   activation: tanh
 
-nftmodel: 
+nft_model: 
   fn: ./module/subgroup_nft
   name: SubgroupNFT
 

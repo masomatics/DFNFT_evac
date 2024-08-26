@@ -16,7 +16,7 @@ modelargs:
   transition_model: LS
   activation: tanh
 
-nftmodel: 
+nft_model: 
   fn: ./module/ft_decimation
   name: NFT
 

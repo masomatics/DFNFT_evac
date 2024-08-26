@@ -38,8 +38,8 @@ def main():
 
     configs["train"]["device"] = 2
 
-    trainer = Trainer(configs)
-    trainer.train()
+    first_trainer = Trainer(configs)
+    first_trainer.train()
 
 
 class Trainer:
@@ -87,7 +87,7 @@ class Trainer:
 
     def _set_optimizer(self):
         self.optimizer = torch.optim.Adam(
-            self.nftmodel.parameters(), lr=self.lr, weight_decay=0.001
+            self.nft_model.parameters(), lr=self.lr, weight_decay=0.001
         )
 
     def report(self, value=None, name=None):
@@ -110,7 +110,7 @@ class Trainer:
         cfg_model = self.configs["model"]
         enc_class = yu.load_component_fxn(cfg_model["encmodel"])
         dec_class = yu.load_component_fxn(cfg_model["decmodel"])
-        nft_class = yu.load_component_fxn(cfg_model["nftmodel"])
+        nft_class = yu.load_component_fxn(cfg_model["nft_model"])
 
         model_args = cfg_model["modelargs"]
         model_args["dim_data"] = self.data.num_sample_points
@@ -122,7 +122,7 @@ class Trainer:
         encoder = enc_class(**model_args, maskmat=mask_matrix)
         decoder = dec_class(**model_args, maskmat=mask_matrix)
 
-        self.nftmodel = nft_class(
+        self.nft_model = nft_class(
             encoder=encoder,
             decoder=decoder,
             require_input_adapter=True,
@@ -144,7 +144,7 @@ class Trainer:
         return mask
 
     def train(self):
-        self.nftmodel.train().to(dtype=self.dtype).to(self.device)
+        self.nft_model.train().to(dtype=self.dtype).to(self.device)
         loader_iter = cycle(self.loader)
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
@@ -156,7 +156,7 @@ class Trainer:
 
             num_shifts = trainT - 1
             self.optimizer.zero_grad()
-            loss = self.nftmodel.loss(trainseqs, num_shifts=num_shifts)
+            loss = self.nft_model.loss(trainseqs, num_shifts=num_shifts)
 
             loss["all_loss"].backward()
             self.optimizer.step()
@@ -167,22 +167,24 @@ class Trainer:
             if self.iter % self.save_freq == 0:
                 print(loss["all_loss"].item())
                 try:
-                    torch.save(self.nftmodel, f"{self.writer_location}/model.pt")
+                    torch.save(self.nft_model, f"{self.writer_location}/model.pt")
                 except Exception:
                     print("torch.nn.utils.parametrize is probably invoked.")
                     torch.save(
-                        self.nftmodel.state_dict(), f"{self.writer_location}/model.pt"
+                        self.nft_model.state_dict(), f"{self.writer_location}/model.pt"
                     )
                 print(f"Model saved at {self.writer_location}/model.pt")
                 self.evaluate()
                 print("Model evaluated")
 
     def evaluate(self):
-        self.nftmodel = self.nftmodel.eval()
+        self.nft_model = self.nft_model.eval()
         evalseq, _ = self.eval_data[0]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, step=self.iter, device=self.device)
-        self.nftmodel = self.nftmodel.train()
+        self.nft_model.evaluate(
+            evalseq, self.writer, step=self.iter, device=self.device
+        )
+        self.nft_model = self.nft_model.train()
 
 
 if __name__ == "__main__":
