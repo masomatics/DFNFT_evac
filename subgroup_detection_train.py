@@ -13,11 +13,9 @@ import numpy as np
 
 from misc import yaml_util as yu
 
-from module.ft_decimation import NFT
-
 
 def main():
-    model_name = "fordebug"
+    model_name = "subgroup_detection"
     data_name = "one_dim_cyclic"
     train_name = "baseline"
     exp_name = f"{data_name}_{model_name}_{train_name}"
@@ -117,25 +115,17 @@ class Trainer:
         model_args = cfg_model["modelargs"]
         model_args["dim_data"] = self.data.num_sample_points
         nft_args = cfg_model["nftargs"]
-        mask = self.create_masks(model_args)
 
-        encs = []
-        decs = []
-        owndecs = []
-        decstars = []
-        for _ in range(nft_args["depth"]):
-            enc1 = enc_class(**model_args, maskmat=mask)
-            dec1 = dec_class(**model_args, maskmat=mask)
-            decStar = dec_class(**model_args, maskmat=mask)
-            encs.append(enc1)
-            decs.append(dec1)
-            decstars.append(decStar)
+        matrix_size = model_args["dim_m"]
+        mask_matrix = torch.ones(matrix_size, matrix_size, requires_grad=False)
 
-        self.nftmodel: NFT = nft_class(
-            encoder=encs,
-            decoder=decs,
+        encoder = enc_class(**model_args, maskmat=mask_matrix)
+        decoder = dec_class(**model_args, maskmat=mask_matrix)
+
+        self.nftmodel = nft_class(
+            encoder=encoder,
+            decoder=decoder,
             require_input_adapter=True,
-            owndecs=owndecs,
             **nft_args,
         )
         self.writer_location = f"./dnftresult/{self.configs['exp_name']}"
@@ -164,28 +154,18 @@ class Trainer:
             trainT = self.trainT
             trainseqs = seqs[:, :trainT]
 
-            rollnum = trainT - 1
+            num_shifts = trainT - 1
             self.optimizer.zero_grad()
-            loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
+            loss = self.nftmodel.loss(trainseqs, num_shifts=num_shifts)
 
-            loss["pred_loss"].backward()
+            loss["all_loss"].backward()
             self.optimizer.step()
 
-            all_loss = loss["all_loss"].item()
-            intermediate_loss = loss["intermediate_loss"].item()
-            pred_loss = loss["pred_loss"].item()
-
-            loss_metrics = {
-                "all_loss": all_loss,
-                "pred_loss": pred_loss,
-                "intermediate_loss": intermediate_loss,
-            }
-
-            for key in loss_metrics:
-                self.report(value=loss_metrics[key], name=key)
+            for key, value in loss.items():
+                self.report(value=value.item(), name=key)
 
             if self.iter % self.save_freq == 0:
-                print(loss_metrics["all_loss"])
+                print(loss["all_loss"].item())
                 try:
                     torch.save(self.nftmodel, f"{self.writer_location}/model.pt")
                 except Exception:
@@ -199,9 +179,9 @@ class Trainer:
 
     def evaluate(self):
         self.nftmodel = self.nftmodel.eval()
-        evalseq, _ = self.eval_data[1]
+        evalseq, _ = self.eval_data[0]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
+        self.nftmodel.evaluate(evalseq, self.writer, step=self.iter, device=self.device)
         self.nftmodel = self.nftmodel.train()
 
 

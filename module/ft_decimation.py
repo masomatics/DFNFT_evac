@@ -38,21 +38,7 @@ class NFT(nn.Module):
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
 
-    def latent_shift(self, insignal, n_rolls, mask, intervene_fxn=None):
-        # determine the regressor on H0, H1
-        self.dynamics._compute_M(insignal[:, :2], mask, orth_proj=self.orth_proj)
-
-        terminal_latent = insignal[:, [0]]  # H0
-        latent_preds = [terminal_latent]
-        for k in range(n_rolls):
-            shifted_latent = self.dynamics(
-                terminal_latent, intervene_fxn=intervene_fxn
-            )  # Hk+2
-            terminal_latent = shifted_latent
-            latent_preds.append(shifted_latent)
-        latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2, ...
-
-        return latent_preds
+  
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, is_reshaped=False):

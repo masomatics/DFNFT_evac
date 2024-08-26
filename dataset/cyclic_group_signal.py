@@ -11,11 +11,11 @@ from typing import Callable
 class CyclicGroupSignal(Dataset):
     def __init__(
         self,
-        num_data: int = 5000,
-        num_shifts: int = 3,
-        num_freqs: int = 5,
+        num_data: int,
+        num_shifts: int,
+        num_freqs: int,
         diffeo_of_circle: Callable[[float], float] = lambda t: t**3,
-        group_param: tuple[int, int] = (2, 11),
+        group_param: tuple[int, int] = (2, 7),
         shift_label: bool = False,
     ) -> None:
         self.num_data = num_data
@@ -30,9 +30,10 @@ class CyclicGroupSignal(Dataset):
         random.seed(0)
         np.random.seed(0)
 
-        self.fixed_freqs = np.array(
-            random.sample(range(self.group_order // 2), num_freqs)
-        )
+        self.fixed_freqs = np.array([0, 1, 2, 3])
+        # np.array(
+        #     random.sample(range(self.group_order // 2), num_freqs)
+        # )
         # (num_freqs, )
         self.freqs = np.array(
             [self.fixed_freqs for _ in range(self.num_data)]
