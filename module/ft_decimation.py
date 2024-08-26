@@ -150,15 +150,15 @@ class NFT(nn.Module):
         pred = self.do_decode(latent, batchsize=batchsize)
         return pred
 
-    def evaluate(self, evalseq, writer, device):
+    def evaluate(self, evalseq, writer, device, iteridx):
         b, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
         print("""!!! Visualization Rendered!!! """)
-        self.visualize(evalseq, predicted, writer)
+        self.visualize(evalseq, predicted, writer, iteridx)
 
-    def visualize(self, evalseq, predicted, writer):
+    def visualize(self, evalseq, predicted, writer, iteridx):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
         # Prediction at -1
@@ -167,7 +167,31 @@ class NFT(nn.Module):
         plt.plot(predicted[-1], label="pred")
         plt.legend()
 
-        writer.add_figure("gt vs predicted", plt.gcf())
+        writer.add_figure("gt vs predicted", plt.gcf(), global_step=iteridx)
+
+    def _mse(self, obstuple, predfuture):
+        errval = torch.mean(
+            torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
+        )
+        return errval
+
+
+class NFTImages(NFT):
+    def visualize(self, evalseq, predicted, writer, iteridx):
+        predicted = predicted[0].to("cpu")
+        evalseq = evalseq[0].to("cpu")
+
+        plt.figure(figsize=(20, 10))
+        for k in range(len(predicted)):
+            plt.subplot(2, len(evalseq), k + 1)
+            plt.imshow(evalseq[k].permute([1, 2, 0]).clamp(0, 1.0))
+            plt.subplot(2, len(predicted), k + 1 + len(evalseq))
+            plt.imshow(predicted[k].permute([1, 2, 0]).clamp(0, 1.0))
+        evalloss = self._mse(evalseq, predicted)
+        print(torch.min(predicted), torch.max(predicted))
+        plt.suptitle(f"""loss mse: {evalloss}""")
+
+        writer.add_figure("gt vs predicted", plt.gcf(), global_step=iteridx)
 
 
 class DFNFT(NFT):

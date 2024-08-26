@@ -19,11 +19,14 @@ from misc import yaml_util as yu
 
 
 def main():
+    # modelname = "fordebug"
+    # datname = "OneDCyclic"
+    # trainname = "baseline"
+
     # modename
-    modelname = "fordebug"
-    # datname = "OneDsignal"
-    datname = "OneDCyclic"
-    trainname = "baseline"
+    modelname = "CNN"
+    datname = "DoubleDat"
+    trainname = "baseline_images"
     mode = "_".join([datname, modelname, trainname])
 
     with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
@@ -164,7 +167,12 @@ class DF_Trainer(object):
         loader_iter = cycle(self.loader)
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
-            [seqs, label] = next(loader_iter)
+
+            datinst = next(loader_iter)
+            if type(datinst) == list:
+                [seqs, label] = datinst
+            else:
+                seqs = datinst
             seqs = seqs.to(dtype=self.dtype).to(self.device)
             # print(f"""Debug label is {label}""")
             # print(seqs[0, 0, :10])
@@ -206,14 +214,20 @@ class DF_Trainer(object):
                         self.nftmodel.state_dict(), f"{self.writerlocation}/model.pt"
                     )
                 print(f"""Model saved at {self.writerlocation}/model.pt""")
-                self.evaluate()
+                self.evaluate(iteridx)
                 print(f"""Model evaluated""")
 
-    def evaluate(self):
+    def evaluate(self, iteridx):
         self.nftmodel = self.nftmodel.eval()
-        evalseq, label = self.eval_data[1]
+        evaldat = self.eval_data[1]
+        if type(evaldat) == list:
+            [evalseq, label] = evaldat
+        else:
+            evalseq = evaldat
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
+        self.nftmodel.evaluate(
+            evalseq, self.writer, device=self.device, iteridx=iteridx
+        )
         self.nftmodel = self.nftmodel.train()
 
 
