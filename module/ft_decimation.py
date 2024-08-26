@@ -52,7 +52,8 @@ class NFT(nn.Module):
 
         self.soft_mask = soft_mask
         if self.soft_mask:
-            self.mask_params = nn.Parameter(torch.normal(mean=torch.zeros(self.encoder.dim_d), std=0.01))
+            sorted_init_value, _ = torch.sort(torch.normal(mean=torch.zeros(self.encoder.dim_d), std=0.01))
+            self.mask_params = nn.Parameter(sorted_init_value)
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, is_reshaped=False):
@@ -165,9 +166,14 @@ class NFT(nn.Module):
 
         plt.figure(figsize=(20, 10))
         plt.imshow(self.soft_mask_matrix.detach().to("cpu"))
-        plt.legend()
 
         writer.add_figure("mask matrix", plt.gcf(), step)
+
+        plt.figure(figsize=(20, 10))
+        plt.imshow(self.dynamics.M[0].detach().to("cpu"))
+        writer.add_figure("M", plt.gcf(), step)
+
+
 
 
 class DFNFT(NFT):

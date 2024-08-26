@@ -33,6 +33,7 @@ class CyclicGroupSignal(Dataset):
         self.fixed_freqs = np.array(
             random.sample(range(self.group_order // 2), num_freqs)
         )
+        self.fixed_freqs = np.array([1, 2, 5, 6, 8])
         # (num_freqs, )
         self.freqs = np.array(
             [self.fixed_freqs for _ in range(self.num_data)]
