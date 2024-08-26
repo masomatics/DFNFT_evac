@@ -12,7 +12,8 @@ import copy
 import numpy as np
 
 from misc import yaml_util as yu
-
+from module.subgroup_nft import SubgroupNFT
+from tqdm import tqdm
 
 def main():
     model_name = "subgroup_detection"
@@ -116,7 +117,7 @@ class Trainer:
         model_args["dim_data"] = self.data.num_sample_points
         nft_args = cfg_model["nftargs"]
 
-        matrix_size = model_args["dim_m"]
+        matrix_size = model_args["dim_d"]
         mask_matrix = torch.ones(matrix_size, matrix_size, requires_grad=False)
 
         encoder = enc_class(**model_args, maskmat=mask_matrix)
@@ -134,7 +135,7 @@ class Trainer:
         print(f"Work will be saved at {self.writer_location}")
 
     def create_masks(self, model_args, layer=0):
-        matsize = model_args["dim_m"]
+        matsize = model_args["dim_d"]
         if layer == 0:
             mask = torch.ones(matsize, matsize, requires_grad=False)
         else:
@@ -186,6 +187,17 @@ class Trainer:
         )
         self.nft_model = self.nft_model.train()
 
+class SubgroupDetector:
+    def __init__(self, nft_model, data)->None:
+        self.nft_model = nft_model
+        self.data = data
+        self.loader = DataLoader(self.data, batch_size=64, shuffle=False, num_workers=1)
+        self.Ms = []
 
+    def init_rep_matrices(self)->None:
+        for data in self.loader:
+            print(data)
+            import pdb
+            pdb.set_trace()
 if __name__ == "__main__":
     main()

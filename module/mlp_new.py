@@ -16,12 +16,12 @@ class MaskFlatLinear(nn.Module):
         assert self.out_dim % self.dim_d == 0
         assert self.in_dim % self.dim_d == 0
 
-        self.dim_m_in = self.in_dim // self.dim_d
-        self.dim_m_out = self.out_dim // self.dim_d
+        self.dim_d_in = self.in_dim // self.dim_d
+        self.dim_d_out = self.out_dim // self.dim_d
         self.maskmat = maskmat
         self.initializer_range = initializer_range
-        self.dim_m_mask = nn.Parameter(
-            torch.ones(self.dim_m_out, self.dim_m_in), requires_grad=False
+        self.dim_d_mask = nn.Parameter(
+            torch.ones(self.dim_d_out, self.dim_d_in), requires_grad=False
         )
 
         # self.register_buffer('kronmask', kronmask)
@@ -34,7 +34,7 @@ class MaskFlatLinear(nn.Module):
 
     def forward(self, x):
         if self.maskmat is not None:
-            kronmask = torch.kron(self.maskmat, self.dim_m_mask)
+            kronmask = torch.kron(self.maskmat, self.dim_d_mask)
             weight = self.W * kronmask
         else:
             weight = self.W
