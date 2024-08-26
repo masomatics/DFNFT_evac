@@ -168,20 +168,12 @@ class Trainer:
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
 
-            loss["pred_loss"].backward()
+            loss["all_loss"].backward()
             self.optimizer.step()
 
-            all_loss = loss["all_loss"].item()
-            intermediate_loss = loss["intermediate_loss"].item()
-            pred_loss = loss["pred_loss"].item()
+            loss_metrics = {key:value.item() for key, value in loss.items()}
 
-            loss_metrics = {
-                "all_loss": all_loss,
-                "pred_loss": pred_loss,
-                "intermediate_loss": intermediate_loss,
-            }
-
-            for key in loss_metrics.keys():
+            for key in loss_metrics:
                 self.report(value=loss_metrics[key], name=key)
 
             if self.iter % self.save_freq == 0:
@@ -201,7 +193,7 @@ class Trainer:
         self.nftmodel = self.nftmodel.eval()
         evalseq, _ = self.eval_data[1]
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nftmodel.evaluate(evalseq, self.writer, device=self.device)
+        self.nftmodel.evaluate(evalseq, self.writer, device=self.device, step=self.iter)
         self.nftmodel = self.nftmodel.train()
 
 

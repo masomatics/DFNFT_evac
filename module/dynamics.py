@@ -32,13 +32,12 @@ def _solve(A, B, mask=None):
 
     AAT = A @ A.transpose(-2, -1)
     BAT = B @ A.transpose(-2, -1)
-    if mask is not None:
-        mask = mask.to(AAT.device)
-        AAT = AAT * mask
-        BAT = BAT * mask
+    
     M = torch.linalg.solve(AAT, BAT, left=False)  # b  n  n
-
-    return M
+    if mask is None:
+        return M
+    mask = mask.to(M.device)
+    return M * mask
 
 
 # Regression and Internal Prediction Module

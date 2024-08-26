@@ -10,15 +10,27 @@ from matplotlib import pyplot as plt
 from einops import rearrange
 from module import dynamics as dyn
 
+from torch import Tensor
 
+
+def get_soft_mask_matrix(mask_params:Tensor)->Tensor:
+    diff = torch.abs(mask_params.unsqueeze(0) - mask_params.unsqueeze(1))
+    return torch.exp(-diff)
+
+def get_laplacian(matrix:Tensor)->Tensor:
+    assert matrix.ndim == 2 and matrix.shape[0] == matrix.shape[1]
+    return torch.diag(torch.sum(matrix, dim=1)) - matrix
+    
 class NFT(nn.Module):
     def __init__(
         self,
         encoder: list,
         decoder: list,
+        soft_mask:bool = False,
         orth_proj=False,
         is_Dimside=False,
         require_input_adapter=False,
+
         **kwargs,
     ):
         assert len(encoder) == 1
@@ -38,21 +50,9 @@ class NFT(nn.Module):
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
 
-    def latent_shift(self, insignal, n_rolls, mask, intervene_fxn=None):
-        # determine the regressor on H0, H1
-        self.dynamics._compute_M(insignal[:, :2], mask, orth_proj=self.orth_proj)
-
-        terminal_latent = insignal[:, [0]]  # H0
-        latent_preds = [terminal_latent]
-        for k in range(n_rolls):
-            shifted_latent = self.dynamics(
-                terminal_latent, intervene_fxn=intervene_fxn
-            )  # Hk+2
-            terminal_latent = shifted_latent
-            latent_preds.append(shifted_latent)
-        latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2, ...
-
-        return latent_preds
+        self.soft_mask = soft_mask
+        if self.soft_mask:
+            self.mask_params = nn.Parameter(torch.normal(mean=torch.zeros(self.encoder.dim_d), std=0.01))
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, is_reshaped=False):
@@ -92,15 +92,6 @@ class NFT(nn.Module):
         # latent_preds = [latent[:, [0]], latent[:, [1]]]
         # terminal_latent = latent[:, [1]]  # H1
 
-        # for k in range(n_rolls - 1):
-        #     shifted_latent = self.dynamics(terminal_latent)  # H1+k
-        #     terminal_latent = shifted_latent
-        #     latent_preds.append(shifted_latent)
-        # latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
-        # print(f""" {latent_preds[0,0,0]}, Debug Latent Pred0""")
-        # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
-        # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
-
         predicted = self.do_decode(
             latent_preds, batch_size=batch_size
         )  # X0, X1, X2, ...
@@ -108,9 +99,13 @@ class NFT(nn.Module):
 
         return predicted
 
+    @property
+    def soft_mask_matrix(self)->Tensor | None:
+        return get_soft_mask_matrix(self.mask_params) if self.soft_mask else None
+
     def shift_latent(self, latent, n_rolls=1):
         # determine the regressor on H0, H1
-        self.dynamics._compute_M(latent[:, :2])
+        self.dynamics._compute_M(latent[:, :2], mask=self.soft_mask_matrix)
         # print(self.dynamics.M[0, 0], "FOR Debug M")
         latent_preds = [latent[:, [0]], latent[:, [1]]]
         terminal_latent = latent[:, [1]]  # H1
@@ -133,13 +128,13 @@ class NFT(nn.Module):
             torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
         )
 
-        # pred_loss = dyn._mse(
-        #     obstuple[:, 1:], predfuture[:, 1:]
-        # )  # d([X1hat, X1], [X2hat, X2])
-
-        loss = {"all_loss": pred_loss}
+        blockness_loss = torch.trace(get_laplacian(self.soft_mask_matrix))
+        # import pdb
+        # pdb.set_trace()
+        loss = {"all_loss": pred_loss + 0.1 * blockness_loss}
         loss["intermediate_loss"] = torch.tensor([0.0])
         loss["pred_loss"] = pred_loss
+        loss["blockness_loss"] = blockness_loss
 
         return loss
 
@@ -149,15 +144,15 @@ class NFT(nn.Module):
         pred = self.do_decode(latent, batch_size=batch_size)
         return pred
 
-    def evaluate(self, evalseq, writer, device):
+    def evaluate(self, evalseq, writer, device, step):
         _, t = evalseq.shape[0], evalseq.shape[1]
         initialpair = evalseq[:, :2].to(device)
         rolllength = t - 1
         predicted = self(initialpair, n_rolls=rolllength).detach()
         print("""!!! Visualization Rendered!!! """)
-        self.visualize(evalseq, predicted, writer)
+        self.visualize(evalseq, predicted, writer, step)
 
-    def visualize(self, evalseq, predicted, writer):
+    def visualize(self, evalseq, predicted, writer, step):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
         # Prediction at -1
@@ -166,7 +161,13 @@ class NFT(nn.Module):
         plt.plot(predicted[-1], label="pred")
         plt.legend()
 
-        writer.add_figure("gt vs predicted", plt.gcf())
+        writer.add_figure("gt vs predicted", plt.gcf(), step)
+
+        plt.figure(figsize=(20, 10))
+        plt.imshow(self.soft_mask_matrix.detach().to("cpu"))
+        plt.legend()
+
+        writer.add_figure("mask matrix", plt.gcf(), step)
 
 
 class DFNFT(NFT):
