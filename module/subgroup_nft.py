@@ -75,7 +75,7 @@ class SubgroupNFT(nn.Module):
         group_lasso_loss = torch.mean(tensors_sparseloss(self.dynamics.M))
 
         return {
-            "all_loss": pred_loss + 0.1 * group_lasso_loss,
+            "all_loss": pred_loss + 1.0 * group_lasso_loss,
             "pred_loss": pred_loss,
             "group_lasso_loss": group_lasso_loss,
             "intermediate_loss": Tensor([0.0]),
@@ -149,5 +149,4 @@ def tensors_sparseloss(Ms: Tensor, add_noise: bool = True) -> Tensor:
         torch.sum((Ms_expand_one - Ms_expand_two) ** 2, dim=2)
     )  # |M(g_i) - M(g_j)|_{L^2}
 
-    small_e = torch.ones_like(l2_diff_matrix) * 1e-5
-    return l2_diff_matrix + small_e
+    return l2_diff_matrix

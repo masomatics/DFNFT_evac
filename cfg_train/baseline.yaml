@@ -1,10 +1,10 @@
 trainT: 3
 evalT: 10
-itermax: 20000
+itermax: 1000000
 report_freq: 10
 save_freq: 100 
 device: 0
 lr: 0.00001
-batch_size: 512
+batch_size: 64
 debug: False
 seed: 0
