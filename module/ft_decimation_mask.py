@@ -13,6 +13,7 @@ from misc import loss_helper as lh
 import pdb
 from module import dynamics as dyn
 from misc import maskmodule as mm
+from module import input_adapters as in_adapt
 
 
 class NFT(nn.Module):
@@ -24,6 +25,8 @@ class NFT(nn.Module):
         is_Dimside=False,
         require_input_adapter=False,
         dynamics_mask=None,
+        lambda_strength=0,
+        input_adapter="vanilla_input_adapter",
         **kwargs,
     ):
         super().__init__()
@@ -36,6 +39,7 @@ class NFT(nn.Module):
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
             self.PLambdaNet = mm.SimpleMaskModule(dimRep=self.encoder.dim_m, dimVec=1)
+            self.lambda_strength = lambda_strength
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
@@ -121,7 +125,7 @@ class NFT(nn.Module):
         loss = {}
         loss["intermediate"] = torch.tensor([0.0]).to(predfuture.device)
         loss["predloss"] = predloss
-        loss["blockness"] = 0.01 * torch.trace(
+        loss["blockness"] = self.lambda_strength * torch.trace(
             self.PLambdaNet.get_laplacian(self.dynamic_mask)
         )
         all_loss = 0

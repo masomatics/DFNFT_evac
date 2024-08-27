@@ -34,6 +34,7 @@ class NFT(nn.Module):
             self.encoder.require_input_adapter = self.require_input_adapter
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
+            self.dynamics_mask = self.encoder.maskmat
 
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
@@ -201,7 +202,6 @@ class DFNFT(NFT):
         self.nftlayers = nn.ModuleList(nftlist)
         self.depth = len(self.nftlayers)
         self.terminal_dynamics = nftlist[-1].dynamics
-        self.device = self.nftlayers[0].device
 
         self.experimental_mode = False
         for key in kwargs:

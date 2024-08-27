@@ -25,12 +25,19 @@ def main():
     modelname = "Trial_OwnDecoder"
     datname = "OneDsignal_OddEven"
     trainname = "debug"
-    """
+
+    OR
 
     modelname = "mask1layer"
-    # modelname = "Plambda_trial"
     datname = "OneDsignal_OddEven"
     trainname = "baseline"
+
+    """
+
+    # modelname = "mask1layer"
+    modelname = "Plambda_trial"
+    datname = "OneDsignal_OddEven_wide"
+    trainname = "faster"
 
     # modelname = "CNN"
     # datname = "DoubleDat"
@@ -53,7 +60,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 0
+    configs["train"]["device"] = 5
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -186,7 +193,9 @@ class DF_Trainer(object):
 
         self.depth = nft_args["depth"]
         for k in range(self.depth):
-            model_args_k = copy.deepcopy(model_args)
+            model_args_k = self.args_layerwise(model_args, layer=k)
+            nft_args_k = self.args_layerwise(nft_args, layer=k)
+
             """
             TEMPORARY TREATMENT. MASKS 
             """
@@ -194,15 +203,7 @@ class DF_Trainer(object):
             dynamic_mask = self.create_masks(model_args_k, layer=1)
 
             if k > 0:
-                # Se the next dim_data to be the previous latent_dim.
-
                 model_args_k["dim_data"] = nftmodels[k - 1].encoder.dim_latent
-
-            if k == 0:
-                # TEMMPORARY! EXPERIMENTAL FROM HERE
-                # model_args_k["activation"] = "id"
-                pass
-                # TEMMPORARY! EXPERIMENTAL UPTO HERE
 
             enc_k = enc_class(**model_args_k, maskmat=mask)
             dec_k = dec_class(**model_args_k, maskmat=mask)
@@ -215,10 +216,11 @@ class DF_Trainer(object):
                 require_input_adapter=k == 0,
                 owndecs=owndecs,
                 dynamics_mask=dynamic_mask,
-                **nft_args,
+                layer_idx=k,
+                **nft_args_k,
             )
             nftmodels.append(nftmodel)
-        if "nftlayer" in nft_args.keys():
+        if "nftlayer" in nft_args_k.keys():
             self.nftmodel = dfnft_class(
                 nftlist=nftmodels,
                 owndecoders=decstars,
@@ -288,14 +290,15 @@ class DF_Trainer(object):
             loss_metrics = loss
             if self.debug == True:
                 for key in loss_metrics.keys():
-                    print(f"""{self.iter}: {loss_metrics[key].item()}""")
+                    print(f"""{self.iter}: {key} {loss_metrics[key].item()}""")
 
             for key in loss_metrics.keys():
                 self.report(value=loss_metrics[key].item(), name=key)
 
             if self.iter % self.save_freq == 0:
                 # print(loss_metrics["all_loss"])
-                print(loss_metrics)
+                for key in loss_metrics.keys():
+                    print(f"""{self.iter}: {key} {loss_metrics[key].item()}""")
                 try:
                     torch.save(self.nftmodel, f"""{self.writerlocation}/model.pt""")
                 except:
@@ -322,6 +325,14 @@ class DF_Trainer(object):
             )
 
         self.nftmodel = self.nftmodel.train()
+
+    def args_layerwise(self, baseargs, layer):
+        baseargs_k = copy.deepcopy(baseargs)
+        for key in baseargs_k.keys():
+            if "," in key:
+                vals = key.split(",")
+                baseargs_k[key] = vals[layer]
+        return baseargs_k
 
 
 if __name__ == "__main__":

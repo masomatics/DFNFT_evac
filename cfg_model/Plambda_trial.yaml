@@ -22,6 +22,7 @@ nftmodel:
   name: NFT
 
 nftargs:
-  orth_proj: True
+  orth_proj: False
   depth: 1
   is_Dimside: False
+  lambda_strength: 0.05

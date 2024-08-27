@@ -62,7 +62,7 @@ def spectrum(mymodel, myloader, mywriter, step, device):
     Ms = {0: [], 1: []}
     shifts = []
 
-    if isinstance(mymodel, ftd.DFNFT):
+    if hasattr(mymodel, "nftlayers"):
         mynft = mymodel.nftlayers[0]
     else:
         mynft = mymodel
