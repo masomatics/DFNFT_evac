@@ -16,11 +16,16 @@ from misc import yaml_util as yu
 from module.subgroup_nft import SubgroupNFT
 from tqdm import tqdm
 
-from misc.block_diagonalization import tracenorm_of_normalized_laplacian, make_identity_like, commdec
+from misc.block_diagonalization import (
+    tracenorm_of_normalized_laplacian,
+    make_identity_like,
+    commdec,
+)
 
 from torch import nn, Tensor
 import matplotlib.pyplot as plt
 from numpy.linalg import inv
+
 
 def main():
     model_name = "subgroup_detection"
@@ -49,14 +54,14 @@ def main():
     trainer = Trainer(configs)
     trainer.train()
 
-    subgroup_detector = SubgroupDetector(
-        nft_model=trainer.nft_model,
-        data=trainer.data,
-        writer=trainer.writer,
-        device=trainer.device,
-    )
-    subgroup_detector.init_rep_matrices()
-    subgroup_detector.simultaneous_diagonalization()
+    # subgroup_detector = SubgroupDetector(
+    #     nft_model=trainer.nft_model,
+    #     data=trainer.data,
+    #     writer=trainer.writer,
+    #     device=trainer.device,
+    # )
+    # subgroup_detector.init_rep_matrices()
+    # subgroup_detector.simultaneous_diagonalization()
 
 
 class Trainer:
@@ -196,11 +201,12 @@ class Trainer:
 
     def evaluate(self):
         self.nft_model = self.nft_model.eval()
-        evalseq, _ = self.eval_data[0]
-        evalseq = (evalseq.to(dtype=self.dtype))[None, :]
-        self.nft_model.evaluate(
-            evalseq, self.writer, step=self.iter, device=self.device
-        )
+        obs_list = []
+        for i in range(self.loader.batch_size):
+            signal, _ = self.eval_data[i]
+            obs_list.append(signal)
+        obs = torch.stack(obs_list)
+        self.nft_model.evaluate(obs, self.writer, step=self.iter, device=self.device)
         self.nft_model = self.nft_model.train()
 
 
@@ -212,7 +218,7 @@ class SubgroupDetector:
         self.device = device
         self.nft_model = nft_model.eval().to(dtype=torch.float64).to(device=self.device)
 
-        self.Ms:Tensor|None = None
+        self.Ms: Tensor | None = None
         self.change_of_basis = None
 
     def init_rep_matrices(self) -> None:
@@ -231,6 +237,7 @@ class SubgroupDetector:
         P, _ = commdec(Ms_np)
 
         block_Ms = np.real(inv(P) @ Ms_np @ P)
+
 
 if __name__ == "__main__":
     main()

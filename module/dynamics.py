@@ -37,7 +37,6 @@ def _solve(A, B, mask=None):
         AAT = AAT * mask
         BAT = BAT * mask
     M = torch.linalg.solve(AAT, BAT, left=False)  # b  n  n
-
     return M
 
 

@@ -55,6 +55,7 @@ class SubgroupNFT(nn.Module):
         Only latent[:, :2] matters.
         """
         self.dynamics._compute_M(H=latent[:, :2])  # determine the action matrix M
+
         latent_regression = [latent[:, [0]], latent[:, [1]]]
         for k in range(num_shifts - 1):
             next_latent = self.dynamics(latent_regression[-1])  # H_{k+1}
@@ -71,20 +72,12 @@ class SubgroupNFT(nn.Module):
         )
 
         # self.dynamics.M has shape=(b, d, d)
-        # d = self.dynamics.M.shape[1]
-        # group_representation_loss = torch.mean(
-        #     torch.sum(
-        #         torch.abs(
-        #             self.dynamics.M - torch.eye(d).to(self.dynamics.M.device)
-        #         ),  # M[i] - I_d, shape=(b, d, d)
-        #         dim=(1, 2),
-        #     )
-        # )
+        group_lasso_loss = torch.mean(tensors_sparseloss(self.dynamics.M))
 
         return {
-            "all_loss": pred_loss,
+            "all_loss": pred_loss + 0.1 * group_lasso_loss,
             "pred_loss": pred_loss,
-            # "group_representation_loss": group_representation_loss,
+            "group_lasso_loss": group_lasso_loss,
             "intermediate_loss": Tensor([0.0]),
             # "ratio_of_identity_matrices": self.get_ratio_of_identity_matrices(),
         }
@@ -115,7 +108,18 @@ class SubgroupNFT(nn.Module):
 
         writer.add_figure("shifted gt vs predicted", plt.gcf(), global_step=step)
 
-    # def get_ratio_of_identity_matrices(self, threshold: float = 0.1) -> Tensor:
+        loss_matrix = (
+            tensors_sparseloss(Ms=self.dynamics.M, add_noise=False).detach().to("cpu")
+        )
+        display_size = min(32, loss_matrix.shape[0])
+        loss_matrix = loss_matrix[:display_size, :display_size]
+        plt.figure(figsize=(20, 20))
+        plt.matshow(loss_matrix)
+        writer.add_figure("|M(g_i) - M(g_j)|", plt.gcf(), global_step=step)
+
+        plt.close()
+
+    # def get_ratio_of_identity_matrices(self, threshold: float = 1) -> Tensor:
     #     b, d, _ = self.dynamics.M.shape
     #     return torch.mean(
     #         (
@@ -128,3 +132,22 @@ class SubgroupNFT(nn.Module):
     #             <= threshold
     #         ).float()
     #     )
+
+
+def tensors_sparseloss(Ms: Tensor, add_noise: bool = True) -> Tensor:
+    Ms = rearrange(Ms, "n0 ... -> n0 (...)")
+    Ms_expand_one = Ms.unsqueeze(1)
+    if add_noise:
+        Ms_expand_one = (
+            Ms_expand_one
+            + torch.randn(list(Ms_expand_one.shape)).to(device=Ms_expand_one.device)
+            * 1e-7
+        )  # to prevent from grad being nan (because of sqrt and zero)
+    Ms_expand_two = Ms.unsqueeze(0)
+
+    l2_diff_matrix = torch.sqrt(
+        torch.sum((Ms_expand_one - Ms_expand_two) ** 2, dim=2)
+    )  # |M(g_i) - M(g_j)|_{L^2}
+
+    small_e = torch.ones_like(l2_diff_matrix) * 1e-5
+    return l2_diff_matrix + small_e
