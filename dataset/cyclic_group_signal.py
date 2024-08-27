@@ -95,10 +95,7 @@ class CyclicGroupSignal(Dataset):
                 cos_coeffs,
             )  # (N, num_freqs) * (num_freqs, ) -> (N, )
             shifted_signals.append(torch.from_numpy(signal))
-
-        return torch.stack(
-            shifted_signals
-        ), g_action * math.pi * 2 if self.shift_label else torch.stack(shifted_signals)
+        return torch.stack(shifted_signals), g_action * math.pi * 2
 
 
 if __name__ == "__main__":

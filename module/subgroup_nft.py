@@ -71,31 +71,31 @@ class SubgroupNFT(nn.Module):
         )
 
         # self.dynamics.M has shape=(b, d, d)
-        d = self.dynamics.M.shape[1]
-        group_representation_loss = torch.mean(
-            torch.sum(
-                torch.abs(
-                    self.dynamics.M - torch.eye(d).to(self.dynamics.M.device)
-                ),  # M[i] - I_d, shape=(b, d, d)
-                dim=(1, 2),
-            )
-        )
+        # d = self.dynamics.M.shape[1]
+        # group_representation_loss = torch.mean(
+        #     torch.sum(
+        #         torch.abs(
+        #             self.dynamics.M - torch.eye(d).to(self.dynamics.M.device)
+        #         ),  # M[i] - I_d, shape=(b, d, d)
+        #         dim=(1, 2),
+        #     )
+        # )
 
         return {
-            "all_loss": pred_loss + group_representation_loss,
+            "all_loss": pred_loss,
             "pred_loss": pred_loss,
-            "group_representation_loss": group_representation_loss,
-            "intermediate_loss": Tensor([0]),
-            "ratio_of_identity_matrices": self.get_ratio_of_identity_matrices(),
+            # "group_representation_loss": group_representation_loss,
+            "intermediate_loss": Tensor([0.0]),
+            # "ratio_of_identity_matrices": self.get_ratio_of_identity_matrices(),
         }
 
     def evaluate(
         self, obs: Tensor, writer: SummaryWriter, step: int, device: torch.device
     ) -> None:
-        """  mask = torch.ones(matsize, matsize, requires_grad=False)
+        """mask = torch.ones(matsize, matsize, requires_grad=False)
         obs: shape=(B, T, ...)
         """
-        num_shifts = obs.shape[1]
+        num_shifts = obs.shape[1] - 1
         prediction = self(obs.to(device=device), num_shifts)
 
         # The first data in the given batch
@@ -103,22 +103,28 @@ class SubgroupNFT(nn.Module):
         prediction = prediction[0].detach().to("cpu")
 
         plt.figure(figsize=(20, 10))
+        plt.plot(obs[0], label="gt")
+        plt.plot(prediction[0], label="pred")
+        plt.legend()
+        writer.add_figure("initial gt vs predicted", plt.gcf(), global_step=step)
+
+        plt.figure(figsize=(20, 10))
         plt.plot(obs[-1], label="gt")
         plt.plot(prediction[-1], label="pred")
         plt.legend()
 
-        writer.add_figure("gt vs predicted", plt.gcf(), global_step=step)
+        writer.add_figure("shifted gt vs predicted", plt.gcf(), global_step=step)
 
-    def get_ratio_of_identity_matrices(self, threshold: float = 0.1) -> Tensor:
-        b, d, _ = self.dynamics.M.shape
-        return torch.mean(
-            (
-                torch.sum(
-                    torch.abs(
-                        self.dynamics.M - torch.eye(d).to(self.dynamics.M.device)
-                    ),  # M[i] - I_d, shape=(b, d, d)
-                    dim=(1, 2),
-                )
-                <= threshold
-            ).float()
-        )
+    # def get_ratio_of_identity_matrices(self, threshold: float = 0.1) -> Tensor:
+    #     b, d, _ = self.dynamics.M.shape
+    #     return torch.mean(
+    #         (
+    #             torch.sum(
+    #                 torch.abs(
+    #                     self.dynamics.M - torch.eye(d).to(self.dynamics.M.device)
+    #                 ),  # M[i] - I_d, shape=(b, d, d)
+    #                 dim=(1, 2),
+    #             )
+    #             <= threshold
+    #         ).float()
+    #     )

@@ -38,8 +38,6 @@ class NFT(nn.Module):
             self.dynamics = dyn.Dynamics()
         self.orth_proj = orth_proj
 
-  
-
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, is_reshaped=False):
         # expect   N T C H W

@@ -1,6 +1,7 @@
 import sys
 import random
 from itertools import cycle
+from einops import repeat
 
 sys.path.append("../")
 import torch
@@ -14,6 +15,12 @@ import numpy as np
 from misc import yaml_util as yu
 from module.subgroup_nft import SubgroupNFT
 from tqdm import tqdm
+
+from misc.block_diagonalization import tracenorm_of_normalized_laplacian, make_identity_like, commdec
+
+from torch import nn, Tensor
+import matplotlib.pyplot as plt
+from numpy.linalg import inv
 
 def main():
     model_name = "subgroup_detection"
@@ -39,8 +46,17 @@ def main():
 
     configs["train"]["device"] = 2
 
-    first_trainer = Trainer(configs)
-    first_trainer.train()
+    trainer = Trainer(configs)
+    trainer.train()
+
+    subgroup_detector = SubgroupDetector(
+        nft_model=trainer.nft_model,
+        data=trainer.data,
+        writer=trainer.writer,
+        device=trainer.device,
+    )
+    subgroup_detector.init_rep_matrices()
+    subgroup_detector.simultaneous_diagonalization()
 
 
 class Trainer:
@@ -187,17 +203,34 @@ class Trainer:
         )
         self.nft_model = self.nft_model.train()
 
+
 class SubgroupDetector:
-    def __init__(self, nft_model, data)->None:
-        self.nft_model = nft_model
+    def __init__(self, nft_model, data, writer, device) -> None:
         self.data = data
         self.loader = DataLoader(self.data, batch_size=64, shuffle=False, num_workers=1)
-        self.Ms = []
+        self.writer = writer
+        self.device = device
+        self.nft_model = nft_model.eval().to(dtype=torch.float64).to(device=self.device)
 
-    def init_rep_matrices(self)->None:
-        for data in self.loader:
-            print(data)
-            import pdb
-            pdb.set_trace()
+        self.Ms:Tensor|None = None
+        self.change_of_basis = None
+
+    def init_rep_matrices(self) -> None:
+        M_list = []
+        for signal, _ in self.loader:
+            self.nft_model(signal.to(device=self.device))  # compute M
+            M_list.append(self.nft_model.dynamics.M.clone().detach())
+        self.Ms = torch.cat(M_list)
+        assert self.Ms.shape[0] == self.data.num_data
+
+    def simultaneous_diagonalization(self) -> None:
+        """
+        Find a (complex valued) matrix P such that the matrices {PM(g)P^{-1}} become block matrices.
+        """
+        Ms_np = self.Ms.detach().to("cpu").numpy()
+        P, _ = commdec(Ms_np)
+
+        block_Ms = np.real(inv(P) @ Ms_np @ P)
+
 if __name__ == "__main__":
     main()
