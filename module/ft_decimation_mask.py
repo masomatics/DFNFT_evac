@@ -70,6 +70,9 @@ class NFT(nn.Module):
 
     def __call__(self, obs, n_rolls=1, mask=None):
         self.dynamic_mask = self.PLambdaNet.create_mask()
+        # self.dynamic_mask = torch.ones(self.encoder.dim_m, self.encoder.dim_m).to(
+        #     obs.device
+        # )
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
         if self.require_input_adapter == True:
@@ -118,7 +121,7 @@ class NFT(nn.Module):
         loss = {}
         loss["intermediate"] = torch.tensor([0.0]).to(predfuture.device)
         loss["predloss"] = predloss
-        loss["blockness"] = 0.1 * torch.trace(
+        loss["blockness"] = 0.01 * torch.trace(
             self.PLambdaNet.get_laplacian(self.dynamic_mask)
         )
         all_loss = 0

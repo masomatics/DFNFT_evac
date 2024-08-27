@@ -27,7 +27,6 @@ def _solve(A, B, mask=None):
     # return B A^-1　 : solve M for  M A= B
     # A = A.to(dtype=torch.float64)  # b n d
     # B = B.to(dtype=torch.float64)  # b n d
-
     b, n, d = A.shape
     assert A.shape == B.shape
 
@@ -63,12 +62,12 @@ class Dynamics(object):
         _H1 = H1.reshape(H1.shape[0], -1, H1.shape[-1])  # b n d
 
         M_star = _solve(_H0, _H1, mask=mask)
-        if orth_proj:
-            M_star = op.orthogonal_projection_kernel(M_star)
         if mask is not None:
             self.M = M_star * mask[None, :]
         else:
             self.M = M_star
+        if orth_proj:
+            M_star = op.orthogonal_projection_kernel(M_star)
 
         # check  "_mse( M_star[0] @_H0[0] , _H1[0])" and  _mse(self(H0), H1) is small
         # print(f"""H0 svd : {torch.linalg.svd(H0)[1][0]} """ )
