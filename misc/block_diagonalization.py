@@ -4,7 +4,6 @@ from einops import repeat
 import torch
 import torch.nn as nn
 from einops import repeat
-from misc.laplacian import tracenorm_of_normalized_laplacian, make_identity_like
 from tqdm import tqdm
 import numpy as np
 
