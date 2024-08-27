@@ -62,6 +62,11 @@ def spectrum(mymodel, myloader, mywriter, step, device):
     Ms = {0: [], 1: []}
     shifts = []
 
+    if isinstance(mymodel, ftd.DFNFT):
+        mynft = mymodel.nftlayers[0]
+    else:
+        mynft = mymodel
+
     if mymodel.depth > 1:
         for k in range(10):
             evalseq, shift = next(iter(myloader))
@@ -139,11 +144,17 @@ def spectrum(mymodel, myloader, mywriter, step, device):
 
         mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
 
+        for layer in range(len(mymodel.nftlayers)):
+            plt.figure()
+            matrixMeanshape = torch.mean(
+                torch.abs(mymodel.nftlayers[layer].dynamics.M.detach()), axis=0
+            )
+            plt.imshow(matrixMeanshape.to("cpu"))
+            mywriter.add_figure(
+                f""" Matrix Meanshape {[layer]}""", plt.gcf(), global_step=step
+            )
+
     else:
-        if isinstance(mymodel, ftd.DFNFT):
-            mynft = mymodel.nftlayers[0]
-        else:
-            mynft = mymodel
         for k in range(10):
             evalseq, shift = next(iter(myloader))
             evalseq = evalseq[:, :2].to(mynft.encoder.device)
@@ -211,20 +222,15 @@ def spectrum(mymodel, myloader, mywriter, step, device):
 
         mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
 
+        matrixMeanshape = torch.mean(torch.abs(mynft.dynamics.M.detach()), axis=0)
+
+        plt.imshow(matrixMeanshape.to("cpu"))
+        mywriter.add_figure(f""" Matrix Meanshape""", plt.gcf(), global_step=step)
+
     plt.figure()
-    matrixL0DeltaNorms = lh.tensors_sparseloss(mymodel.nftlayers[0].dynamics.M)
+    matrixL0DeltaNorms = lh.tensors_sparseloss(mynft.dynamics.M)
     plt.imshow(matrixL0DeltaNorms.to("cpu").detach())
     mywriter.add_figure("Matrix Variety, Batch x Batch", plt.gcf(), global_step=step)
-
-    for layer in range(len(mymodel.nftlayers)):
-        plt.figure()
-        matrixMeanshape = torch.mean(
-            torch.abs(mymodel.nftlayers[layer].dynamics.M.detach()), axis=0
-        )
-        plt.imshow(matrixMeanshape.to("cpu"))
-        mywriter.add_figure(
-            f""" Matrix Meanshape {[layer]}""", plt.gcf(), global_step=step
-        )
 
     # plt_image = plot_to_image(plt)
     # # Log the image to TensorBoard

@@ -2,56 +2,17 @@ import sys
 
 sys.path.append("./")
 sys.path.append("./module")
-sys.path.append("./misc")
-
 
 from torch import nn
 import torch
 from einops import rearrange, einsum
 import math
 import pdb
+from utils import maskmodule as mm
+from module import mlp_new as mn
 
 
-class MaskFlatLinear(nn.Module):
-    def __init__(
-        self, dim_m: int, in_dim: int, out_dim: int, maskmat=None, initializer_range=0.1
-    ):
-        super().__init__()
-
-        self.dim_m = dim_m
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        assert self.out_dim % self.dim_m == 0
-        assert self.in_dim % self.dim_m == 0
-
-        self.dim_a_in = self.in_dim // self.dim_m
-        self.dim_a_out = self.out_dim // self.dim_m
-        self.maskmat = maskmat
-        self.initializer_range = initializer_range
-        self.dim_a_mask = nn.Parameter(
-            torch.ones(self.dim_a_out, self.dim_a_in), requires_grad=False
-        )
-
-        # self.register_buffer('kronmask', kronmask)
-
-        self.W = nn.Parameter(torch.zeros(self.out_dim, self.in_dim))
-        self.b = nn.Parameter(torch.zeros(self.out_dim))
-
-        torch.nn.init.normal_(self.W, std=self.initializer_range)
-        torch.nn.init.normal_(self.b, std=self.initializer_range)
-
-    def forward(self, x):
-        if self.maskmat is not None:
-            kronmask = torch.kron(self.maskmat, self.dim_a_mask)
-            weight = self.W * kronmask
-        else:
-            weight = self.W
-        x = einsum(weight, x, "... o i,  ... i -> ... o")
-        x = x + self.b
-        return x
-
-
-class MLP_AE(nn.Module):
+class MM_MLP_AE(nn.Module):
     def __init__(
         self,
         dim_a,
@@ -77,7 +38,7 @@ class MLP_AE(nn.Module):
         self.dim_data = dim_data
         self.no_embed = True
         self.no_mask = no_mask
-        self.maskmat = nn.Parameter(maskmat, requires_grad=False)
+
         self.hidden_dim = hidden_dim
         self.require_input_adapter = require_input_adapter
         self.dim_latent = self.dim_m * self.dim_a
@@ -98,7 +59,7 @@ class MLP_AE(nn.Module):
         return next(self.parameters()).device if self.parameters() else None
 
 
-class MLPEncoder(MLP_AE):
+class MM_MLPEncoder(MM_MLP_AE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -119,10 +80,10 @@ class MLPEncoder(MLP_AE):
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
                 modseq.append(
-                    MaskFlatLinear(
+                    mn.MaskFlatLinear(
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
-                        maskmat=self.maskmat,
+                        maskmat=None,
                         dim_m=self.dim_m,
                     )
                 )
@@ -131,16 +92,21 @@ class MLPEncoder(MLP_AE):
                 modseq.append(self.activation_fxn)
         self.net = nn.Sequential(*modseq)
 
-    def forward(self, signal):
-        xs = signal
+    def forward(self, signal, mask):
+        H = signal
         if not self.require_input_adapter:
-            xs = rearrange(xs, "... d m -> ... (d m)")
-        H = self.net(xs)
+            H = rearrange(signal, "... d m -> ... (d m)")
+
+        for layer in self.net():
+            if isinstance(layer, mn.MaskFlatLinear):
+                H = layer(H, mask)
+            else:
+                H = layer(H)
         H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
         return H
 
 
-class MLPDecoder(MLP_AE):
+class MM_MLPDecoder(MM_MLP_AE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         dimlist = [self.hidden_dim] * (1 + self.depth)
@@ -159,10 +125,10 @@ class MLPDecoder(MLP_AE):
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(
-                    MaskFlatLinear(
+                    mn.MaskFlatLinear(
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
-                        maskmat=self.maskmat,
+                        maskmat=None,
                         dim_m=self.dim_m,
                     )
                 )
@@ -175,7 +141,11 @@ class MLPDecoder(MLP_AE):
 
         self.net = nn.Sequential(*modseq)
 
-    def forward(self, xs):
-        xs = xs.reshape([xs.shape[0], -1])
-        H = self.net(xs)
+    def forward(self, xs, mask):
+        H = xs.reshape([xs.shape[0], -1])
+        for layer in self.net():
+            if isinstance(layer, mn.MaskFlatLinear):
+                H = layer(H, mask)
+            else:
+                H = layer(H)
         return H

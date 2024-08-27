@@ -1,0 +1,19 @@
+#root: /tmp/datasets/MNIST
+fn: dataset/mnist_data.py
+name: SequentialMNIST_double
+args:
+  root: ../data/MNIST
+  train: True
+  T: 3
+  max_T: 9
+  #max_angle_velocity_ratio: [-1.0, 1.0]
+  max_angle_velocity_ratio: [-0.5, 0.5]
+  #max_angle_velocity_ratio: [-0, 0]
+  max_color_velocity_ratio: [-0.5, 0.5]
+  max_pos: [-10, 10]
+  max_trans_accl: [0, 0]
+  only_use_digit4: True
+  backgrnd: False
+  pair_transition: False
+  same_object: True
+  fixpos: False

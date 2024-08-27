@@ -12,6 +12,7 @@ from misc import orthog_proj as op
 from misc import loss_helper as lh
 import pdb
 from module import dynamics as dyn
+from misc import maskmodule as mm
 
 
 class NFT(nn.Module):
@@ -34,7 +35,7 @@ class NFT(nn.Module):
             self.encoder.require_input_adapter = self.require_input_adapter
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
-
+            self.PLambdaNet = mm.SimpleMaskModule(dimRep=self.encoder.dim_m, dimVec=1)
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
@@ -68,27 +69,16 @@ class NFT(nn.Module):
         return obshat
 
     def __call__(self, obs, n_rolls=1, mask=None):
+        self.dynamic_mask = self.PLambdaNet.create_mask()
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
-        latent = self.do_encode(obs)  # b t n a
-        # print(latent[0, 0, :5], "ForDebug LAT")
-        # print(latent[0, 1, :5], "ForDebug LAT")
+        if self.require_input_adapter == True:
+            mask = torch.ones(self.encoder.dim_m, self.encoder.dim_m).to(obs.device)
+        latent = self.do_encode(obs, mask)  # b t n a
 
-        latent_preds = self.shift_latent(latent, n_rolls=n_rolls, mask=mask)
-        # determine the regressor on H0, H1
-        # self.dynamics._compute_M(latent[:, :2])
-        # # print(self.dynamics.M[0, 0], "FOR Debug M")
-        # latent_preds = [latent[:, [0]], latent[:, [1]]]
-        # terminal_latent = latent[:, [1]]  # H1
-
-        # for k in range(n_rolls - 1):
-        #     shifted_latent = self.dynamics(terminal_latent)  # H1+k
-        #     terminal_latent = shifted_latent
-        #     latent_preds.append(shifted_latent)
-        # latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
-        # print(f""" {latent_preds[0,0,0]}, Debug Latent Pred0""")
-        # print(f""" {latent_preds[0,1,0]}, Debug Latent Pred1""")
-        # print(f""" {latent_preds[0,2,0]}, Debug Latent Pred2""")
+        latent_preds = self.shift_latent(
+            latent, n_rolls=n_rolls, mask=self.dynamic_mask
+        )
 
         predicted = self.do_decode(latent_preds)  # X0, X1, X2, ...
         # print(predicted[0, -1, :5], "Debug XPred")
@@ -122,14 +112,19 @@ class NFT(nn.Module):
         predloss = torch.mean(
             torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
         )
-
         # predloss = dyn._mse(
         #     obstuple[:, 1:], predfuture[:, 1:]
         # )  # d([X1hat, X1], [X2hat, X2])
-
-        loss = {"all_loss": predloss}
-        loss["intermediate"] = torch.tensor([0.0])
+        loss = {}
+        loss["intermediate"] = torch.tensor([0.0]).to(predfuture.device)
         loss["predloss"] = predloss
+        loss["blockness"] = 0.1 * torch.trace(
+            self.PLambdaNet.get_laplacian(self.dynamic_mask)
+        )
+        all_loss = 0
+        for key in loss:
+            all_loss = all_loss + loss[key]
+        loss["all_loss"] = all_loss
 
         return loss
 

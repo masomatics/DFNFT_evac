@@ -65,7 +65,10 @@ class Dynamics(object):
         M_star = _solve(_H0, _H1, mask=mask)
         if orth_proj:
             M_star = op.orthogonal_projection_kernel(M_star)
-        self.M = M_star * mask[None, :]
+        if mask is not None:
+            self.M = M_star * mask[None, :]
+        else:
+            self.M = M_star
 
         # check  "_mse( M_star[0] @_H0[0] , _H1[0])" and  _mse(self(H0), H1) is small
         # print(f"""H0 svd : {torch.linalg.svd(H0)[1][0]} """ )

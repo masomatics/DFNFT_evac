@@ -20,19 +20,21 @@ from misc import spectrum_evaluate as sev
 
 
 def main():
+    """
     # FOR DEBUG, use Trial_OwnDecoder, OneDsignal_OddEven + debug
-
-    # modelname = "Trial_OwnDecoder"
-    # datname = "OneDsignal_OddEven"
-    # trainname = "debug"
+    modelname = "Trial_OwnDecoder"
+    datname = "OneDsignal_OddEven"
+    trainname = "debug"
+    """
 
     modelname = "mask1layer"
-    # modelname = "OneLayer_lasso"
-    # modelname = "fordebug"
-    # datname = "OneDsignal_c8mimic"
+    # modelname = "Plambda_trial"
     datname = "OneDsignal_OddEven"
-    # datname = "OneDCyclic"
     trainname = "baseline"
+
+    # modelname = "CNN"
+    # datname = "DoubleDat"
+    # trainname = "baseline_images"
     mode = "_".join([datname, modelname, trainname])
 
     with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
@@ -51,7 +53,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 6
+    configs["train"]["device"] = 0
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -250,12 +252,12 @@ class DF_Trainer(object):
         for iteridx in tqdm(range(self.itermax)):
             self.iter = iteridx
 
-            if self.iter % 1000 == 0:
-                sev.spectrum(
-                    self.nftmodel, self.loader, self.writer, iteridx, self.device
-                )
+            mydat = next(loader_iter)
+            if type(mydat) == list:
+                [seqs, label] = mydat
+            else:
+                seqs = mydat
 
-            [seqs, label] = next(loader_iter)
             seqs = seqs.to(dtype=self.dtype).to(self.device)
             # print(f"""Debug label is {label}""")
             # print(seqs[0, 0, :10])
@@ -269,25 +271,27 @@ class DF_Trainer(object):
             rollnum = trainT - 1
             self.optimizer.zero_grad()
             loss = self.nftmodel.loss(trainseqs, n_rolls=rollnum)
-
             loss["all_loss"].backward()
+
             self.optimizer.step()
 
-            all_loss = loss["all_loss"].item()
-            intermediate = loss["intermediate"].item()
-            predloss = loss["predloss"].item()
+            # all_loss = loss["all_loss"].item()
+            # intermediate = loss["intermediate"].item()
+            # predloss = loss["predloss"].item()
 
-            loss_metrics = {
-                "all_loss": all_loss,
-                "predloss": predloss,
-                "intermediate": intermediate,
-            }
+            # loss_metrics = {
+            #     "all_loss": all_loss,
+            #     "predloss": predloss,
+            #     "intermediate": intermediate,
+            # }
 
+            loss_metrics = loss
             if self.debug == True:
-                print(f"""{self.iter}: {loss_metrics}""")
+                for key in loss_metrics.keys():
+                    print(f"""{self.iter}: {loss_metrics[key].item()}""")
 
             for key in loss_metrics.keys():
-                self.report(value=loss_metrics[key], name=key)
+                self.report(value=loss_metrics[key].item(), name=key)
 
             if self.iter % self.save_freq == 0:
                 # print(loss_metrics["all_loss"])
@@ -305,9 +309,18 @@ class DF_Trainer(object):
 
     def evaluate(self, step):
         self.nftmodel = self.nftmodel.eval()
-        evalseq, label = self.eval_data[1]
+        datinst = self.eval_data[1]
+        if type(datinst) == list:
+            evalseq, label = datinst
+        else:
+            evalseq = datinst
         evalseq = (evalseq.to(dtype=self.dtype))[None, :]
         self.nftmodel.evaluate(evalseq, self.writer, device=self.device, step=step)
+        if self.iter % 1000 == 0:
+            sev.spectrum(
+                self.nftmodel, self.loader, self.writer, self.iter, self.device
+            )
+
         self.nftmodel = self.nftmodel.train()
 
 
