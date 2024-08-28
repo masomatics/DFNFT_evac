@@ -14,6 +14,7 @@ import pdb
 from module import dynamics as dyn
 from misc import maskmodule as mm
 from module import input_adapters as in_adapt
+from misc import yaml_util as yu
 
 
 class NFT(nn.Module):
@@ -27,6 +28,8 @@ class NFT(nn.Module):
         dynamics_mask=None,
         lambda_strength=0,
         input_adapter="vanilla_input_adapter",
+        plambdanet="SimpleMaskModule",
+        dimLambdaVec=1,
         **kwargs,
     ):
         super().__init__()
@@ -38,12 +41,22 @@ class NFT(nn.Module):
             self.encoder.require_input_adapter = self.require_input_adapter
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
-            self.PLambdaNet = mm.SimpleMaskModule(dimRep=self.encoder.dim_m, dimVec=1)
+            self.PLambdaNet = mm.SimpleMaskModule(
+                dimRep=self.encoder.dim_m, dimVec=dimLambdaVec
+            )
             self.lambda_strength = lambda_strength
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
             self.dynamics = dyn.Dynamics()
+
+        if self.require_input_adapter == True:
+            input_adapter_class = yu.load_module(
+                "./module/input_adapters.py", input_adapter
+            )
+            self.input_adapter = input_adapter_class(
+                **kwargs, dim_data=self.encoder.dim_data
+            )
         self.orth_proj = orth_proj
 
     @property
@@ -56,6 +69,7 @@ class NFT(nn.Module):
         # expect   N T C H W
         b, t = obs.shape[0], obs.shape[1]
         obs_nt = rearrange(obs, "b t ... -> (b t) ...")
+        obs_nt = self.input_adapter.forward(obs_nt)
         latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
         bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
@@ -66,6 +80,8 @@ class NFT(nn.Module):
         batchsize = latent.shape[0]
         latent = rearrange(latent, "n t ... -> (n t) ...")
         obshat_batched = self.decoder(latent)  # (N T) obshape
+        obshat_batched = self.input_adapter.deforward(obshat_batched)
+
         if do_reshape:
             obshat = rearrange(obshat_batched, "(n t) ... -> n t ...", n=batchsize)
         else:
@@ -115,7 +131,6 @@ class NFT(nn.Module):
         # print(predfuture[0, -1, :5])
         # print(predfuture[0, 1:, :5])
         # pdb.set_trace()
-
         predloss = torch.mean(
             torch.sum((obstuple - predfuture) ** 2, axis=tuple(range(2, obstuple.ndim)))
         )

@@ -8,21 +8,22 @@ decmodel:
   name: MLPDecoder
 
 modelargs:
-  dim_data: 128
-  dim_m: 10
-  dim_a: 16
-  depth: 4
-  hidden_dim: 260
+  dim_data: 1024
+  dim_m: 16
+  dim_a: 64
+  depth: 3
+  hidden_dim: 256
   predictive: True
   transition_model: LS
   activation: tanh
 
 nftmodel: 
   fn: ./module/ft_decimation_mask
-  name: NFT
+  name: NFTImages
 
 nftargs:
   orth_proj: True
   depth: 1
   is_Dimside: False
-  lambda_strength: 0.05
+  blockness_weight: 0.05
+  input_adapter: image2mlp_adapter

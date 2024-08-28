@@ -35,8 +35,12 @@ def main():
     """
 
     # modelname = "mask1layer"
-    modelname = "Plambda_trial"
-    datname = "OneDsignal_OddEven_wide"
+    # modelname = "Plambda_trial"
+    # datname = "OneDsignal_OddEven_wide"
+    # trainname = "slower"
+
+    modelname = "Plambda_image"
+    datname = "SingleDat"
     trainname = "faster"
 
     # modelname = "CNN"
@@ -60,7 +64,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 5
+    configs["train"]["device"] = 2
 
     trainer = DF_Trainer(configs)
     trainer.train()
