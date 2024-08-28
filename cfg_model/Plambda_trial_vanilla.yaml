@@ -25,4 +25,4 @@ nftargs:
   orth_proj: True
   depth: 1
   is_Dimside: False
-  blockness_weight: 0
+  lambda_strength: 0

@@ -1,17 +1,17 @@
 #root: /tmp/datasets/MNIST
 encmodel:
-  fn: ./module/mlp_new
-  name: MLPEncoder
+  fn: ./module/mlp_lambda_mask
+  name: MM_MLPEncoder
 
 decmodel:
-  fn: ./module/mlp_new
-  name: MLPDecoder
+  fn: ./module/mlp_lambda_mask
+  name: MM_MLPDecoder
 
 modelargs:
   dim_data: 1024
   dim_m: 16
   dim_a: 64
-  depth: 3
+  depth: 4
   hidden_dim: 256
   predictive: True
   transition_model: LS
@@ -25,5 +25,5 @@ nftargs:
   orth_proj: True
   depth: 1
   is_Dimside: False
-  blockness_weight: 0.05
+  lambda_strength: 0.05
   input_adapter: image2mlp_adapter

@@ -8,8 +8,43 @@ import torch
 from einops import rearrange, einsum
 import math
 import pdb
-from utils import maskmodule as mm
 from module import mlp_new as mn
+
+
+class MM_MaskFlatLinear(nn.Module):
+    def __init__(self, dim_m: int, in_dim: int, out_dim: int, initializer_range=0.1):
+        super().__init__()
+
+        self.dim_m = dim_m
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        assert self.out_dim % self.dim_m == 0
+        assert self.in_dim % self.dim_m == 0
+
+        self.dim_a_in = self.in_dim // self.dim_m
+        self.dim_a_out = self.out_dim // self.dim_m
+        self.initializer_range = initializer_range
+        self.dim_a_mask = nn.Parameter(
+            torch.ones(self.dim_a_out, self.dim_a_in), requires_grad=False
+        )
+
+        # self.register_buffer('kronmask', kronmask)
+
+        self.W = nn.Parameter(torch.zeros(self.out_dim, self.in_dim))
+        self.b = nn.Parameter(torch.zeros(self.out_dim))
+
+        torch.nn.init.normal_(self.W, std=self.initializer_range)
+        torch.nn.init.normal_(self.b, std=self.initializer_range)
+
+    def forward(self, x, maskmat=None):
+        if maskmat is not None:
+            kronmask = torch.kron(maskmat, self.dim_a_mask)
+            weight = self.W * kronmask
+        else:
+            weight = self.W
+        x = einsum(weight, x, "... o i,  ... i -> ... o")
+        x = x + self.b
+        return x
 
 
 class MM_MLP_AE(nn.Module):
@@ -80,10 +115,9 @@ class MM_MLPEncoder(MM_MLP_AE):
             else:
                 # modseq.append(nn.Linear(dimlist[k-1], dimlist[k]))
                 modseq.append(
-                    mn.MaskFlatLinear(
+                    MM_MaskFlatLinear(
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
-                        maskmat=None,
                         dim_m=self.dim_m,
                     )
                 )
@@ -92,13 +126,13 @@ class MM_MLPEncoder(MM_MLP_AE):
                 modseq.append(self.activation_fxn)
         self.net = nn.Sequential(*modseq)
 
-    def forward(self, signal, mask):
+    def forward(self, signal, mask=None):
         H = signal
         if not self.require_input_adapter:
             H = rearrange(signal, "... d m -> ... (d m)")
 
-        for layer in self.net():
-            if isinstance(layer, mn.MaskFlatLinear):
+        for layer in self.net:
+            if isinstance(layer, MM_MaskFlatLinear):
                 H = layer(H, mask)
             else:
                 H = layer(H)
@@ -125,10 +159,9 @@ class MM_MLPDecoder(MM_MLP_AE):
                 modseq.append(nn.Linear(dimlist[k - 1], dimlist[k]))
             else:
                 modseq.append(
-                    mn.MaskFlatLinear(
+                    MM_MaskFlatLinear(
                         in_dim=dimlist[k - 1],
                         out_dim=dimlist[k],
-                        maskmat=None,
                         dim_m=self.dim_m,
                     )
                 )
@@ -141,9 +174,9 @@ class MM_MLPDecoder(MM_MLP_AE):
 
         self.net = nn.Sequential(*modseq)
 
-    def forward(self, xs, mask):
+    def forward(self, xs, mask=None):
         H = xs.reshape([xs.shape[0], -1])
-        for layer in self.net():
+        for layer in self.net:
             if isinstance(layer, mn.MaskFlatLinear):
                 H = layer(H, mask)
             else:

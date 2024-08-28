@@ -65,21 +65,21 @@ class NFT(nn.Module):
         return next(self.parameters()).device
 
     # NEEDS TO ALSO DEAL WITH PATCH INFO
-    def do_encode(self, obs, embed=None):
+    def do_encode(self, obs, embed=None, mask=None):
         # expect   N T C H W
         b, t = obs.shape[0], obs.shape[1]
         obs_nt = rearrange(obs, "b t ... -> (b t) ...")
         obs_nt = self.input_adapter.forward(obs_nt)
-        latent_bt = self.encoder(signal=obs_nt)  # batch numtokens dim
+        latent_bt = self.encoder(signal=obs_nt, mask=mask)  # batch numtokens dim
         bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
         return latent
 
-    def do_decode(self, latent, do_reshape=True):
+    def do_decode(self, latent, do_reshape=True, mask=None):
         # expect input N T dim
         batchsize = latent.shape[0]
         latent = rearrange(latent, "n t ... -> (n t) ...")
-        obshat_batched = self.decoder(latent)  # (N T) obshape
+        obshat_batched = self.decoder(latent, mask=mask)  # (N T) obshape
         obshat_batched = self.input_adapter.deforward(obshat_batched)
 
         if do_reshape:
