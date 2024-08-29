@@ -45,18 +45,23 @@ class NFT(nn.Module):
                 dimRep=self.encoder.dim_m, dimVec=dimLambdaVec
             )
             self.lambda_strength = lambda_strength
+
+            if self.require_input_adapter == True:
+                nftadapter = input_adapter
+            else:
+                nftadapter = "vanilla_input_adapter"
+            input_adapter_class = yu.load_module(
+                "./module/input_adapters.py", nftadapter
+            )
+            self.input_adapter = input_adapter_class(
+                **kwargs, dim_data=self.encoder.dim_data
+            )
+
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
         else:
             self.dynamics = dyn.Dynamics()
 
-        if self.require_input_adapter == True:
-            input_adapter_class = yu.load_module(
-                "./module/input_adapters.py", input_adapter
-            )
-            self.input_adapter = input_adapter_class(
-                **kwargs, dim_data=self.encoder.dim_data
-            )
         self.orth_proj = orth_proj
 
     @property
@@ -67,19 +72,26 @@ class NFT(nn.Module):
     # NEEDS TO ALSO DEAL WITH PATCH INFO
     def do_encode(self, obs, embed=None, mask=None):
         # expect   N T C H W
+        encoding_mask = mask
         b, t = obs.shape[0], obs.shape[1]
         obs_nt = rearrange(obs, "b t ... -> (b t) ...")
         obs_nt = self.input_adapter.forward(obs_nt)
-        latent_bt = self.encoder(signal=obs_nt, mask=mask)  # batch numtokens dim
+        latent_bt = self.encoder(
+            signal=obs_nt, mask=encoding_mask
+        )  # batch numtokens dim
+
         bt, n, d = latent_bt.shape
         latent = rearrange(latent_bt, "(b t) n d -> b t n d", b=b)
+
         return latent
 
     def do_decode(self, latent, do_reshape=True, mask=None):
+        # When there is only one layer, this own_mask shall be None
+        decoding_mask = self.PLambdaNet.own_mask
         # expect input N T dim
         batchsize = latent.shape[0]
         latent = rearrange(latent, "n t ... -> (n t) ...")
-        obshat_batched = self.decoder(latent, mask=mask)  # (N T) obshape
+        obshat_batched = self.decoder(latent, mask=decoding_mask)  # (N T) obshape
         obshat_batched = self.input_adapter.deforward(obshat_batched)
 
         if do_reshape:
@@ -89,10 +101,10 @@ class NFT(nn.Module):
         return obshat
 
     def __call__(self, obs, n_rolls=1, mask=None):
-        self.dynamic_mask = self.PLambdaNet.create_mask()
-        # self.dynamic_mask = torch.ones(self.encoder.dim_m, self.encoder.dim_m).to(
-        #     obs.device
-        # )
+        self.dynamic_mask = (
+            self.PLambdaNet.create_mask()
+        )  # Input is none, so "it uses self.lambda."
+
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
         if self.require_input_adapter == True:
@@ -212,13 +224,11 @@ class NFTImages(NFT):
 
 
 class DFNFT(NFT):
-    def __init__(self, nftlist: list[NFT], owndecoders: list, **kwargs):
+    def __init__(self, nftlist: list[NFT], owndecoders: list = [], **kwargs):
         super().__init__(encoder=None, decoder=None)
-        self.owndecoders = nn.ModuleList(owndecoders)
         self.nftlayers = nn.ModuleList(nftlist)
         self.depth = len(self.nftlayers)
         self.terminal_dynamics = nftlist[-1].dynamics
-        self.device = self.nftlayers[0].device
 
         self.experimental_mode = False
         for key in kwargs:
@@ -227,42 +237,57 @@ class DFNFT(NFT):
             setattr(self, key, kwargs[key])
 
         # Turning on the input_adapter for the first layer of NFT
-        self.owndecoders.require_input_adapter = True
         assert self.nftlayers[0].require_input_adapter == True
+
+    """
+    Given input x, returns 
+    [Phi0(x), Phi1(x), .... Phi_depth(x)]    
+    """
 
     def do_encode(self, obs):
         latent = obs
         latents = []
+        lambda_k = None
+        mask_k = None
+
+        # From k=0 ... depth, the masks are
+        # None,  P(Lambda0),  P(Lambda1), ....   and these will be stored as
+        # PLambdaNet.own_mask[k] for each k.
         for k in range(self.depth):
-            latent = self.nftlayers[k].do_encode(latent)
+            latent = self.nftlayers[k].do_encode(latent, mask=mask_k)
+            # PLambdaNet remembers the previous mask_k as "own_mask" to be used for the decoder, and crunch out
+            # next lambda_k .  The "next" mask is to remembered as kth "dynamics_mask", to be used for the
+            # OUTPUT of kth encoder. mask_k is outputted so that we can feed it to next PLambaNet when necessary.
+            mask_k, lambda_k = self.nftlayers[k].PLambdaNet(
+                lambda_prev=lambda_k, prev_mask=mask_k
+            )
             latents.append(latent)
         return latents
 
     def do_decode(self, latent, layer_idx_from_bottom=0):
         # exepcts N T dim
         batchsize = latent.shape[0]
-        latent = rearrange(latent, "n t ... -> (n t) ...")
+        # latent = rearrange(latent, "n t ... -> (n t) ...")
         for j in range(layer_idx_from_bottom, self.depth):
             loc = self.depth - (j + 1)
-            latent = self.owndecoders[loc](latent)
+            # use OWN mask for the decoder.
+            mask = self.nftlayers[loc].PLambdaNet.own_mask
+            latent = self.nftlayers[loc].do_decode(latent, mask=mask)
 
         obshat = latent
-        obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
+        # obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
     def intermediate_decode(self, kth_latent, layer_idx_from_bottom=0):
         # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
         batchsize = kth_latent.shape[0]
         kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
-        kth_latent = self.owndecoders[(self.depth - 1) - layer_idx_from_bottom](
-            kth_latent
-        )
+        loc = (self.depth - 1) - layer_idx_from_bottom
+
+        decoder_mask = self.nftlayers[loc].PLambdaNet.own_mask
+        kth_latent = self.nftlayers[loc].decoder(kth_latent, mask=decoder_mask)
         kplus1th_latent = rearrange(kth_latent, "(n t) ... -> n t ...", n=batchsize)
 
-        ##### EXPERIMENTALLLLLL!!!!!!
-        # kplus1th_latent = self.nftlayers[
-        #     (self.depth - 1) - layer_idx_from_bottom
-        # ].do_decode(kth_latent)
         return kplus1th_latent
 
     def evaluate(self, evalseq, writer, device, step):
@@ -272,41 +297,28 @@ class DFNFT(NFT):
         predicted, _, _ = self(initialpair, n_rolls=rolllength)
         predicted = predicted.detach()
         print("""!!! Visualization Rendered!!! """)
-        self.visualize(evalseq, predicted, writer, step)
+        self.nftlayers[0].visualize(evalseq, predicted, writer, step)
 
     def __call__(self, obs, n_rolls=1):
         batchsize, t = obs.shape[0], obs.shape[1]
         assert t > 1
+
+        # Phi0(x), Phi1(x)....
         latents = self.do_encode(obs)  # b t n a
-        # print(latent[0, 0, :5], "ForDebug LAT")
-        # print(latent[0, 1, :5], "ForDebug LAT")
+
         latent_preds = []
         for k in range(self.depth):
-            # determine the regressor on H0, H1
+            # Phi_k(x)
             latent = latents[k]
-            # Use the next mask
-            maskidx = min(self.depth - 1, k + 1)
-            mask_k = self.nftlayers[maskidx].encoder.maskmat
-            """
-            EXPERIMENTAL!!!!  Adding NOISE TO LATENT TO BE REGRESSED WHEN NOT at BOTTOM!  FROM HERE
-            """
-            if (
-                hasattr(self, "use_zero_layer_mask")
-                and self.use_zero_layer_mask == True
-            ):
-                mask_k = self.nftlayers[-1].dynamics_mask.to(latent.device)
 
-            noise = torch.normal(
-                mean=torch.zeros(size=latent[:, 1].shape), std=0.0 * (k == 0)
-            ).to(latent.device)
-            noise.requires_grad = False
+            # kth Plambdanet's dynamics_mask is to be applied to the ouput of kth encoder
+            dynamics_mask_k = self.nftlayers[k].PLambdaNet.dynamics_mask
+
+            # Phi_k(x_t) -> Phi_k(x_t+1)  regressed with mask dynamics_mask_k.
             latent_pred = self.nftlayers[k].shift_latent(
-                latent, n_rolls=n_rolls, mask=mask_k, noise=noise
+                latent, n_rolls=n_rolls, mask=dynamics_mask_k, noise=0
             )
             latent_preds.append(latent_pred)
-            """
-            EXPERIMENTAL!!!!  FROM HERE
-            """
 
         intermediate_obs_preds = []
         for k in range(1, self.depth):
@@ -370,25 +382,6 @@ class DFNFT(NFT):
                 intermediate_loss = intermediate_strength * (
                     intermediate_loss + LassoStrength * Lassoloss
                 )
-
-                # noise (EXPERIMENTAL)
-                # intermediate_loss = self.lossfxn(
-                #     torch.mean(latent_preds[0], axis=-1, keepdims=True), latent_preds[0]
-                # )
-                # intermediate_loss = intermediate_loss + self.lossfxn(
-                #     torch.mean(targets[k], axis=-1, keepdims=True),
-                #     intermediate_preds[k],
-                # )
-                # ep = torch.normal(mean=torch.zeros(size=targets[k].shape), std=5.0).to(
-                #     targets[k].device
-                # )
-                # intermediate_loss = intermediate_loss + self.lossfxn(
-                #     targets[k] + ep, intermediate_preds[k]
-                # )
-
-        # predloss = dyn._mse(
-        #     obstuple[:, 1:], predfuture[:, 1:]
-        # )  # d([X1hat, X1], [X2hat, X2])
 
         loss = {"all_loss": predloss + intermediate_loss}
         loss["intermediate"] = intermediate_loss

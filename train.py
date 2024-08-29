@@ -39,9 +39,9 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_image"
+    modelname = "Plambda_image_1layer"
     datname = "SingleDat"
-    trainname = "faster"
+    trainname = "baseline"
 
     # modelname = "CNN"
     # datname = "DoubleDat"
