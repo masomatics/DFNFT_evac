@@ -26,8 +26,8 @@ def main():
     # datname = "OneDsignal_OddEven"
     # trainname = "debug"
 
-    modelname = "mask1layer"
-    # modelname = "OneLayer_lasso"
+    # modelname = "mask1layer"
+    modelname = "OneLayer_lasso"
     # modelname = "fordebug"
     # datname = "OneDsignal_c8mimic"
     datname = "OneDsignal_OddEven"

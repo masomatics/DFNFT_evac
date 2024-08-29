@@ -140,7 +140,7 @@ def spectrum(mymodel, myloader, mywriter, step, device):
         mywriter.add_figure("UP and Bottom", plt.gcf(), global_step=step)
 
     else:
-        if isinstance(mymodel, ftd.DFNFT):
+        if hasattr(mymodel, "nftlayers"):
             mynft = mymodel.nftlayers[0]
         else:
             mynft = mymodel
