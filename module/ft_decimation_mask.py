@@ -41,7 +41,9 @@ class NFT(nn.Module):
             self.encoder.require_input_adapter = self.require_input_adapter
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
-            self.PLambdaNet = mm.SimpleMaskModule(
+
+            Plambda_class = yu.load_module("./misc/maskmodule.py", plambdanet)
+            self.PLambdaNet = Plambda_class(
                 dimRep=self.encoder.dim_m, dimVec=dimLambdaVec
             )
             self.lambda_strength = lambda_strength
@@ -286,6 +288,7 @@ class DFNFT(NFT):
 
         decoder_mask = self.nftlayers[loc].PLambdaNet.own_mask
         kth_latent = self.nftlayers[loc].decoder(kth_latent, mask=decoder_mask)
+        kth_latent = self.nftlayers[loc].input_adapter.deforward(kth_latent)
         kplus1th_latent = rearrange(kth_latent, "(n t) ... -> n t ...", n=batchsize)
 
         return kplus1th_latent
@@ -298,6 +301,19 @@ class DFNFT(NFT):
         predicted = predicted.detach()
         print("""!!! Visualization Rendered!!! """)
         self.nftlayers[0].visualize(evalseq, predicted, writer, step)
+
+        plt.figure()
+        for k in range(self.depth):
+            plt.subplot(1, self.depth, k + 1)
+            if self.nftlayers[k].PLambdaNet.dynamics_mask is not None:
+                plt.imshow(
+                    self.nftlayers[k].PLambdaNet.dynamics_mask.detach().to("cpu")
+                )
+            else:
+                print("Mask is None at this point yet")
+            plt.title(f"""Layer{k} Matrix Mask""")
+
+        writer.add_figure("Dynamic Masks", plt.gcf(), global_step=step)
 
     def __call__(self, obs, n_rolls=1):
         batchsize, t = obs.shape[0], obs.shape[1]

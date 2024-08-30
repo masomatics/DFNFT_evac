@@ -39,7 +39,7 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_image_1layer"
+    modelname = "Plambda_image_2layerHighVec"
     datname = "SingleDat"
     trainname = "baseline"
 
@@ -64,7 +64,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 2
+    configs["train"]["device"] = 6
 
     trainer = DF_Trainer(configs)
     trainer.train()
