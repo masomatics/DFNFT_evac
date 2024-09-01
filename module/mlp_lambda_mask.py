@@ -12,12 +12,15 @@ from module import mlp_new as mn
 
 
 class MM_MaskFlatLinear(nn.Module):
-    def __init__(self, dim_m: int, in_dim: int, out_dim: int, initializer_range=0.1):
+    def __init__(
+        self, dim_m: int, in_dim: int, out_dim: int, initializer_range=0.1, bias=True
+    ):
         super().__init__()
 
         self.dim_m = dim_m
         self.in_dim = in_dim
         self.out_dim = out_dim
+        self.bias = bias
         assert self.out_dim % self.dim_m == 0
         assert self.in_dim % self.dim_m == 0
 
@@ -43,7 +46,8 @@ class MM_MaskFlatLinear(nn.Module):
         else:
             weight = self.W
         x = einsum(weight, x, "... o i,  ... i -> ... o")
-        x = x + self.b
+        if self.bias == True:
+            x = x + self.b
         return x
 
 

@@ -15,6 +15,8 @@ sys.path.append("./module")
 
 from module import RotatingLayers as rl
 import omegaconf
+from module import mlp_lambda_mask as mlm
+
 
 """
 Mask determined at each layer independently.
@@ -31,8 +33,8 @@ class SimpleMaskModule(nn.Module):
         lambdainitial = lambdainitial + torch.normal(
             torch.zeros_like(lambdainitial), 0.0001
         )
-        if dimVec > 1:
-            lambdainitial = F.normalize(lambdainitial, p=2, dim=1)
+        # if dimVec > 1:
+        #     lambdainitial = F.normalize(lambdainitial, p=2, dim=1)
         self.lambdas = nn.Parameter(lambdainitial)
         self.own_mask = None  # OWN MASK IS A PREV MASK, to be used by Decoder
         self.dynamics_mask = None
@@ -63,23 +65,6 @@ class SimpleMaskModule(nn.Module):
         dynamics_mask = self.create_mask(lambdas_next)
         return dynamics_mask, lambdas_next
 
-    # # REMEMBER the input Lambda used as an input and create the mask with it.
-    # def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
-    #     self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to zero, to be used by "encoder/decoder. "
-    #     lambdas_next = self.forward_lambda(lambda_prev)
-    #     dynamics_mask = self.create_mask(lambdas_next)
-    #     self.dynamics_mask = dynamics_mask  # THIS LINE IS REQUIRED AT ALL TIME.
-    #     """
-    #     TODO : DEFINE  __call__ in the Parent Class as
-    #     def __call__(...)
-    #         dynamics_mask, lambdas_next = self.forward_mask(...)
-    #         self.dynamics_mask = dynamics_mask
-
-    #     Change the self.forward_mask()differently for each class.
-
-    #     """
-    #     return dynamics_mask, lambdas_next  # This will be used for dynamics.
-
     def get_laplacian(self, matrix: Tensor) -> Tensor:
         assert matrix.ndim == 2 and matrix.shape[0] == matrix.shape[1]
         return torch.diag(torch.sum(matrix, dim=1)) - matrix
@@ -105,15 +90,6 @@ class SimpleStackModule(SimpleMaskModule):
         if prev_mask is not None:
             dynamics_mask = dynamics_mask * prev_mask
         return dynamics_mask, lambdas_next
-
-    # def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
-    #     self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to None, to be used by "encoder/decoder. "
-    #     lambdas_next = self.forward_lambda(lambda_prev)
-    #     dynamics_mask = self.create_mask(lambdas_next)
-    #     if prev_mask is not None:
-    #         dynamics_mask = dynamics_mask * prev_mask
-    #     self.dynamics_mask = dynamics_mask  # THIS LINE IS REQUIRED AT ALL TIME
-    #     return dynamics_mask, lambdas_next  # This will be used for dynamics.
 
 
 """
@@ -167,7 +143,9 @@ class RotFeatureModule(SimpleMaskModule):
     def forward_lambda(self, in_lambda=None):
         if in_lambda is None:
             in_lambda = self.lambdas
+
         out_lambdas = self.rlnet(in_lambda[None])[0]
+        # out_lambdas = F.normalize(out_lambdas, p=2, dim=1)
         return out_lambdas
 
 
@@ -189,7 +167,7 @@ class RotFeatureMindLessModule(SimpleMaskModule):
         self.opt = OmegaConf.create(opt)
         modseq = nn.ModuleList()
         for k in range(self.opt.depth):
-            modseq.append(rl.RotatingLinear(self.opt, self.dimRep, self.dimRep))
+            modseq.append(rl.RotatingLinear(self.opt, self.dimVec, self.dimVec))
 
         self.rlnet = nn.Sequential(*modseq)
 
@@ -198,7 +176,6 @@ class RotFeatureMindLessModule(SimpleMaskModule):
             in_lambda = self.lambdas
         out_lambdas = self.rlnet(in_lambda[None])[0]
         return out_lambdas
-
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
         lambdas_next = self.forward_lambda(lambda_prev)

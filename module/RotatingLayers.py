@@ -7,6 +7,7 @@ from omegaconf import DictConfig
 from torch import Tensor
 
 from module.rot_utils import rotation_utils
+from module import mlp_lambda_mask as mlm
 
 
 def apply_layer_to_rotating_features(
@@ -210,6 +211,49 @@ class RotatingLinear(nn.Module):
         self.norm = nn.LayerNorm(out_features, elementwise_affine=True)
 
     def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the linear layer with rotating features.
+
+        Args:
+            x (Tensor): Input tensor, shape: (b, n, c).
+
+        Returns:
+            Tensor: Output tensor, shape: (b, n, c).
+        """
+        return apply_layer_to_rotating_features(
+            self.opt, self.fc, self.rotation_bias, self.norm, x
+        )
+
+
+class RotatingMaskLinear(nn.Module):
+    def __init__(
+        self, opt: DictConfig, in_features: int, out_features: int, dim_m: int
+    ) -> None:
+        """
+        Initialize a linear layer with rotating features.
+
+        Args:
+            opt (DictConfig): Configuration options.
+            in_features (int): Number of input features.
+            out_features (int): Number of output features.
+        """
+        super(RotatingLinear, self).__init__()
+
+        self.opt = opt
+        self.dim_m = dim_m
+        self.fc = mlm.MM_MaskFlatLinear(
+            dim_m=dim_m, in_dim=in_features, out_dim=out_features, bias=False
+        )
+        self.fan_in = in_features
+
+        self.rotation_bias = nn.Parameter(
+            torch.empty((1, opt.rotation_dimensions, out_features))
+        )
+        self.rotation_bias = init_rotation_bias(self.fan_in, self.rotation_bias)
+
+        self.norm = nn.LayerNorm(out_features, elementwise_affine=True)
+
+    def forward(self, x: Tensor, mask: Tensor) -> Tensor:
         """
         Forward pass of the linear layer with rotating features.
 
