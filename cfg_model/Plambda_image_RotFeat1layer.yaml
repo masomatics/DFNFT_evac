@@ -11,7 +11,7 @@ modelargs:
   dim_data: 1024
   dim_m: 16
   dim_a: 128
-  depth: 3
+  depth: 4
   hidden_dim: 512
   predictive: True
   transition_model: LS
@@ -23,14 +23,15 @@ nftmodel:
 
 nftargs:
   orth_proj: True
-  depth: 2
+  depth: 1
   is_Dimside: False
-  lambda_strength: 0.01,0.01
+  lambda_strength: 0.0
   input_adapter: image2mlp_adapter
   plambdanet: 
-    name: SimpleStackModule
+    name: RotFeatureModule
     opt:
       dimVec: 16
+      depth: 3
   nftlayer: 
     fn: ./module/ft_decimation_mask
     name: NFTImages

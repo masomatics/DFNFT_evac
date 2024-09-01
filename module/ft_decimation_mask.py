@@ -42,10 +42,12 @@ class NFT(nn.Module):
             self.decoder = decoder
             self.decoder.require_input_adapter = self.require_input_adapter
 
-            Plambda_class = yu.load_module("./misc/maskmodule.py", plambdanet)
-            self.PLambdaNet = Plambda_class(
-                dimRep=self.encoder.dim_m, dimVec=dimLambdaVec
-            )
+            Plambda_class = yu.load_module("./misc/maskmodule.py", plambdanet["name"])
+
+            plambdanet_opt = plambdanet["opt"]
+            plambdanet_opt["dimRep"] = self.encoder.dim_m
+            
+            self.PLambdaNet = Plambda_class(**plambdanet_opt)
             self.lambda_strength = lambda_strength
 
             if self.require_input_adapter == True:

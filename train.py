@@ -39,9 +39,9 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_image_2layerHighVec"
-    datname = "SingleDat"
-    trainname = "baseline"
+    modelname = "Plambda_OneD_RotFeat2layer_ver2"
+    datname = "OneDsignal_c8mimic_lowpow"
+    trainname = "faster"
 
     # modelname = "CNN"
     # datname = "DoubleDat"
