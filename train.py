@@ -39,7 +39,7 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_OneD_RotFeat2layer_ver2"
+    modelname = "Plambda_OneD_RotMaskFeat2layer"
     datname = "OneDsignal_c8mimic_lowpow"
     trainname = "faster"
 
