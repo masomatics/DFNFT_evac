@@ -132,7 +132,10 @@ class NFT(nn.Module):
         # print("DEBUG_L", latent[0, :2, 0])
 
         self.dynamics._compute_M(latent[:, :2], mask, orth_proj=self.orth_proj)
-        # print(self.dynamics.M[0, 0], "FOR Debug M")
+        # print("DEBUG_M", self.dynamics.M[0, 0])
+        # print("DEBUG_M", mask[:2])
+
+        # pdb.set_trace()
         latent_preds = [latent[:, [0]], latent[:, [1]]]
         terminal_latent = latent[:, [1]]  # H1
 
@@ -292,11 +295,12 @@ class DFNFT(NFT):
         # obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
-    def intermediate_decode(self, kth_latent, layer_idx_from_bottom=0):
+    def intermediate_decode(self, latent, layer_idx_from_bottom=0):
         # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
+        loc = (self.depth - 1) - layer_idx_from_bottom
+        kth_latent = latent[loc]
         batchsize = kth_latent.shape[0]
         kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
-        loc = (self.depth - 1) - layer_idx_from_bottom
 
         decoder_mask = self.nftlayers[loc].PLambdaNet.own_mask
         kth_latent = self.nftlayers[loc].decoder(kth_latent, mask=decoder_mask)
@@ -351,15 +355,21 @@ class DFNFT(NFT):
             # if k == 0:
             #     print("Debug2a", latent_pred[0][-1][0])
             #     print("Debug2b", latent[0][0][0])
+            # pdb.set_trace()
 
         intermediate_obs_preds = []
         for k in range(1, self.depth):
             kplus1latent_pred = self.intermediate_decode(
-                latent_preds[k], layer_idx_from_bottom=k
+                latent_preds, layer_idx_from_bottom=k
             )
             intermediate_obs_preds.append(kplus1latent_pred)
+            # print("DEBUG_PRED", kplus1latent_pred[0][-1][:10])
 
         infer_pred = self.do_decode(latent_preds[-1])
+
+        # if self.depth == 1:
+        #     print("DEBUG_PRED", infer_pred[0][-1][:10])
+        # pdb.set_trace()
 
         return infer_pred, latent_preds, intermediate_obs_preds
 
@@ -420,6 +430,12 @@ class DFNFT(NFT):
                 intermediate_loss = intermediate_strength * (
                     intermediate_loss + LassoStrength * Lassoloss
                 )
+
+
+        # if self.depth > 1:
+        #     loss = {"all_loss": 0.0 * predloss + intermediate_loss}
+        # else:
+        #     loss = {"all_loss": predloss + intermediate_loss}
 
         loss = {"all_loss": predloss + intermediate_loss}
         loss["intermediate"] = intermediate_loss

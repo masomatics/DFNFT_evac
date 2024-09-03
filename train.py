@@ -40,11 +40,13 @@ def main():
     # trainname = "slower"
 
     modelname = "Plambda_OneD_RotMaskFeat1layer"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer"
+
     # modelname = "Plambda_OneD_RotFeat1layer_ver7"
 
     datname = "OneDsignal_c8mimic_lowpow"
-    # trainname = "debug"
     trainname = "faster"
+    # trainname = "faster"
 
     # modelname = "CNN"
     # datname = "DoubleDat"
