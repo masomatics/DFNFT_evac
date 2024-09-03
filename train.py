@@ -39,8 +39,11 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_OneD_RotMaskFeat2layer"
+    modelname = "Plambda_OneD_RotMaskFeat1layer"
+    # modelname = "Plambda_OneD_RotFeat1layer_ver7"
+
     datname = "OneDsignal_c8mimic_lowpow"
+    # trainname = "debug"
     trainname = "faster"
 
     # modelname = "CNN"
@@ -134,27 +137,45 @@ class DF_Trainer(object):
                 self.nftmodel.parameters(), lr=self.lr, weight_decay=0.001
             )
         else:
-            print("LR / WEIGHT DECAY EXPERIMENT ACTIVATED!!!!!!" * 10)
-            layer0speed = 0.1
+            layerspeed = 0.01
             self.optimizer = torch.optim.Adam(
                 [
                     {
-                        "params": self.nftmodel.nftlayers[0].parameters(),
-                        "lr": self.lr * layer0speed,
-                        "weight_decay": 0.001,
+                        "params": [
+                            p
+                            for n, p in self.nftmodel.named_parameters()
+                            if not n.startswith("nftlayers.0.PLambdaNet")
+                        ]
                     },
                     {
-                        "params": self.nftmodel.nftlayers[1].parameters(),
-                        "lr": self.lr * layer0speed,
-                        "weight_decay": 0.001,
+                        "params": self.nftmodel.nftlayers[0].PLambdaNet.parameters(),
+                        "lr": self.lr * 0.01,
                     },
-                    {
-                        "params": self.nftmodel.owndecoders.parameters(),
-                        "lr": self.lr,
-                        "weight_decay": 0.001,
-                    },
-                ]
+                ],
+                lr=self.lr,
+                weight_decay=0.001,
             )
+            # print("LR / WEIGHT DECAY EXPERIMENT ACTIVATED!!!!!!" * 10)
+            # layer0speed = 10.0
+            # self.optimizer = torch.optim.Adam(
+            #     [
+            #         {
+            #             "params": self.nftmodel.nftlayers[0].parameters(),
+            #             "lr": self.lr * layer0speed,
+            #             "weight_decay": 0.01,
+            #         },
+            #         {
+            #             "params": self.nftmodel.nftlayers[1].parameters(),
+            #             "lr": self.lr,
+            #             "weight_decay": 0.001,
+            #         },
+            #         # {
+            #         #     "params": self.nftmodel.owndecoders.parameters(),
+            #         #     "lr": self.lr,
+            #         #     "weight_decay": 0.001,
+            #         # },
+            #     ]
+            # )
 
     def report(self, value=None, name=None):
         if self.iter % self.report_freq == 0:

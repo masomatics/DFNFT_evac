@@ -9,6 +9,8 @@ from torch import Tensor
 from module.rot_utils import rotation_utils
 from module import mlp_lambda_mask as mlm
 from einops import rearrange, einsum, repeat
+from torch.nn import functional as F
+import pdb
 
 
 def apply_layer_to_rotating_features(
@@ -32,10 +34,10 @@ def apply_layer_to_rotating_features(
     Returns:
         torch.Tensor: Output rotating features tensor, shape: (b, n, c, h, w) or (b, n, c).
     """
-    if isinstance(layer, torch.nn.Linear):
-        psi = layer(x)  # (b, n, c).
-    elif isinstance(layer, MaskLinear):
+    if isinstance(layer, MaskLinear):
         psi = layer(x, mask)
+    elif isinstance(layer, torch.nn.Linear):
+        psi = layer(x)  # (b, n, c).
     elif isinstance(layer, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
         # Fold rotation dimension into batch dimension.
         x_folded = rearrange(x, "b n c h w -> (b n) c h w")
@@ -50,7 +52,10 @@ def apply_layer_to_rotating_features(
     z = psi + rotation_bias
 
     # Apply binding mechanism.
+
     chi = layer(rotation_utils.get_magnitude(x))
+    # print("DEBUG LAYER", layer.weight)
+    # pdb.set_trace()
     magnitude = 0.5 * magnitude_psi + 0.5 * chi
 
     # Apply activation function.
@@ -229,30 +234,15 @@ class RotatingLinear(nn.Module):
         )
 
 
-class MaskLinear(nn.Module):
-    def __init__(self, in_dim: int, out_dim: int, initializer_range=0.1, bias=True):
-        super().__init__()
+class MaskLinear(nn.Linear):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        self.initializer_range = initializer_range
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.bias = bias
-
-        self.W = nn.Parameter(torch.zeros(self.out_dim, self.in_dim))
-        self.b = nn.Parameter(torch.zeros(self.out_dim))
-
-        torch.nn.init.normal_(self.W, std=self.initializer_range)
-        torch.nn.init.normal_(self.b, std=self.initializer_range)
-
-    def forward(self, x, maskmat=None):
-        if maskmat is not None:
-            weight = self.W * maskmat
+    def forward(self, input: Tensor, mask: Tensor = None) -> Tensor:
+        if mask is not None:
+            return F.linear(input, self.weight * mask, self.bias)
         else:
-            weight = self.W
-        x = einsum(weight, x, "... o i,  ... i -> ... o")
-        if self.bias == True:
-            x = x + self.b
-        return x
+            return F.linear(input, self.weight, self.bias)
 
 
 class RotatingMaskLinear(nn.Module):
@@ -268,7 +258,7 @@ class RotatingMaskLinear(nn.Module):
         super().__init__()
 
         self.opt = opt
-        self.fc = MaskLinear(in_dim=in_features, out_dim=out_features, bias=False)
+        self.fc = MaskLinear(in_features, out_features, bias=False)
         self.fan_in = in_features
 
         self.rotation_bias = nn.Parameter(

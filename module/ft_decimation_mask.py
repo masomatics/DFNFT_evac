@@ -46,7 +46,7 @@ class NFT(nn.Module):
 
             plambdanet_opt = plambdanet["opt"]
             plambdanet_opt["dimRep"] = self.encoder.dim_m
-            
+
             self.PLambdaNet = Plambda_class(**plambdanet_opt)
             self.lambda_strength = lambda_strength
 
@@ -129,6 +129,8 @@ class NFT(nn.Module):
         noise_placeholder = torch.zeros_like(latent).to(latent.device)
         noise_placeholder[:, 1] = noise
         latent = latent + noise_placeholder
+        # print("DEBUG_L", latent[0, :2, 0])
+
         self.dynamics._compute_M(latent[:, :2], mask, orth_proj=self.orth_proj)
         # print(self.dynamics.M[0, 0], "FOR Debug M")
         latent_preds = [latent[:, [0]], latent[:, [1]]]
@@ -139,6 +141,9 @@ class NFT(nn.Module):
             terminal_latent = shifted_latent
             latent_preds.append(shifted_latent)
         latent_preds = torch.concatenate(latent_preds, axis=1)  # H0, H1, H2hat, ...
+        # print("DEBUG2", latent_preds[0][-1][0])
+        # print("DEBUG2M", self.dynamics.M[0][:2])
+
         return latent_preds
 
     def loss(self, obstuple, n_rolls=1):
@@ -265,7 +270,12 @@ class DFNFT(NFT):
             mask_k, lambda_k = self.nftlayers[k].PLambdaNet(
                 lambda_prev=lambda_k, prev_mask=mask_k
             )
+            # if k == 0:
+            #     print("DEBUG_Dmask", self.nftlayers[k].PLambdaNet.dynamics_mask)
+            #     pdb.set_trace()
             latents.append(latent)
+            # if k == 0:
+            #     print("DEBUG", latent[0][0][0])
         return latents
 
     def do_decode(self, latent, layer_idx_from_bottom=0):
@@ -338,6 +348,10 @@ class DFNFT(NFT):
             )
             latent_preds.append(latent_pred)
 
+            # if k == 0:
+            #     print("Debug2a", latent_pred[0][-1][0])
+            #     print("Debug2b", latent[0][0][0])
+
         intermediate_obs_preds = []
         for k in range(1, self.depth):
             kplus1latent_pred = self.intermediate_decode(
@@ -366,6 +380,12 @@ class DFNFT(NFT):
         # [X, Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth-1}(t+1)] to be compared against
         # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
         targets = [obstuple] + latent_preds[:-1]
+
+        # if len(intermediate_preds) > 0:
+        #     print("DEBUG3", intermediate_preds[0][0][0])
+        # else:
+        #     print("DEBUG3", predfuture[0][0])
+        # pdb.set_trace()
 
         intermediate_loss = torch.tensor([0.0]).to(predfuture.device)
         for k in range(self.depth):

@@ -169,6 +169,14 @@ class RotFeatureMaskModule(SimpleMaskModule):
             torch.zeros_like(lambdainitial), 1.0
         )
         lambdainitial = F.normalize(lambdainitial, p=2, dim=1)
+        # lambdainitial = torch.ones(self.dimRep, self.dimVec)
+        # lambdainitial = torch.eye(self.dimRep, self.dimRep)
+        # lambdainitial = lambdainitial[:, : self.dimVec]
+
+        # lambdainitial = lambdainitial + torch.normal(
+        #     torch.zeros_like(lambdainitial), 1.0
+        # )
+        # lambdainitial = F.normalize(lambdainitial, p=2, dim=1)
         self.lambdas = nn.Parameter(lambdainitial)
 
         opt = kwargs
@@ -178,7 +186,6 @@ class RotFeatureMaskModule(SimpleMaskModule):
         modseq = nn.ModuleList()
         for k in range(self.opt.depth):
             modseq.append(rl.RotatingMaskLinear(self.opt, self.dimRep, self.dimRep))
-
         self.rlnet = nn.Sequential(*modseq)
 
     def forward_lambda(
@@ -198,7 +205,12 @@ class RotFeatureMaskModule(SimpleMaskModule):
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
         lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
-        dynamics_mask = self.create_mask(lambdas_next)
+        # print("DEBUG LM", lambdas_next)
+        # pdb.set_trace()
+        if prev_mask is None:
+            dynamics_mask = self.create_mask(lambdas_next)
+        else:
+            dynamics_mask = self.create_mask(lambdas_next) * prev_mask
         return dynamics_mask, lambdas_next
 
 

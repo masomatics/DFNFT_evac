@@ -61,6 +61,11 @@ class Dynamics(object):
         _H0 = H0.reshape(H0.shape[0], -1, H0.shape[-1])  # b n d
         _H1 = H1.reshape(H1.shape[0], -1, H1.shape[-1])  # b n d
 
+        # print("Debug_CM", _H0[0][0])
+        # print("Debug_CM", _H1[0][0])
+        # print("Debug_mask", mask)
+        # pdb.set_trace()
+
         M_star = _solve(_H0, _H1, mask=mask)
         if mask is not None:
             self.M = M_star * mask[None, :]
