@@ -55,7 +55,7 @@ class SimpleMaskModule(nn.Module):
     def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
         self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to zero, to be used by "encoder/decoder. "
         dynamics_mask, lambdas_next = self.forward_mask(
-            lambda_prev=None, prev_mask=None, **kwargs
+            lambda_prev=None, prev_mask=prev_mask, **kwargs
         )
         self.dynamics_mask = dynamics_mask  # THIS LINE IS REQUIRED AT ALL TIME.
         return dynamics_mask, lambdas_next
@@ -193,9 +193,9 @@ class RotFeatureMaskModule(SimpleMaskModule):
         in_lambda=None,
         prev_mask=None,
     ):
-        # if in_lambda is None:
-        #     in_lambda = self.lambdas
-        in_lambda = self.lambdas
+        if in_lambda is None:
+            in_lambda = self.lambdas
+        # in_lambda = self.lambdas
 
         out_lambdas = in_lambda
         for layer in self.rlnet:
@@ -207,10 +207,11 @@ class RotFeatureMaskModule(SimpleMaskModule):
         lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
         # print("DEBUG LM", lambdas_next)
         # pdb.set_trace()
-        if prev_mask is None:
-            dynamics_mask = self.create_mask(lambdas_next)
-        else:
-            dynamics_mask = self.create_mask(lambdas_next) * prev_mask
+        dynamics_mask = self.create_mask(lambdas_next)
+        # if prev_mask is None:
+        #     dynamics_mask = self.create_mask(lambdas_next)
+        # else:
+        #     dynamics_mask = self.create_mask(lambdas_next) * prev_mask
         return dynamics_mask, lambdas_next
 
 
