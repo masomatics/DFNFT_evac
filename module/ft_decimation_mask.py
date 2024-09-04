@@ -295,17 +295,22 @@ class DFNFT(NFT):
         # obshat = rearrange(obshat, "(n t) ... -> n t ...", n=batchsize)
         return obshat
 
-    def intermediate_decode(self, latent, layer_idx_from_bottom=0):
+    def intermediate_decode(self, latent, layer_idx=0):
         # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
-        loc = (self.depth - 1) - layer_idx_from_bottom
+        loc = layer_idx
         kth_latent = latent[loc]
-        batchsize = kth_latent.shape[0]
+        # print(f"""DEBUG {loc}th Latent: """, kth_latent.shape)
+        batchsize, ts, m, a = kth_latent.shape
+
         kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
 
         decoder_mask = self.nftlayers[loc].PLambdaNet.own_mask
         kth_latent = self.nftlayers[loc].decoder(kth_latent, mask=decoder_mask)
         kth_latent = self.nftlayers[loc].input_adapter.deforward(kth_latent)
         kplus1th_latent = rearrange(kth_latent, "(n t) ... -> n t ...", n=batchsize)
+
+        if loc > 0:
+            kplus1th_latent = rearrange(kplus1th_latent, "n t (m a) -> n t m a", m=m)
 
         return kplus1th_latent
 
@@ -356,14 +361,14 @@ class DFNFT(NFT):
             #     print("Debug2a", latent_pred[0][-1][0])
             #     print("Debug2b", latent[0][0][0])
             # pdb.set_trace()
+            # print(f"""DEBUG_Lshape {k} """, latent_pred.shape)
 
         intermediate_obs_preds = []
-        for k in range(1, self.depth):
-            kplus1latent_pred = self.intermediate_decode(
-                latent_preds, layer_idx_from_bottom=k
-            )
+        for k in range(self.depth):
+            kplus1latent_pred = self.intermediate_decode(latent_preds, layer_idx=k)
             intermediate_obs_preds.append(kplus1latent_pred)
             # print("DEBUG_PRED", kplus1latent_pred[0][-1][:10])
+        # [Z0, Z1, Z2, Z3, ... ] ->  [Psi_k(Z_k) ; k = 0, 1, 2, ...  ]
 
         infer_pred = self.do_decode(latent_preds[-1])
 
@@ -391,20 +396,30 @@ class DFNFT(NFT):
         # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
         targets = [obstuple] + latent_preds[:-1]
 
+        # print("DEBUGSHAPE")
+        # for k in range(len(targets)):
+        #     print(f"""target {k}""", targets[k].shape)
+        #     print(f"""intermediate_preds {k}""", intermediate_preds[k].shape)
+
         # if len(intermediate_preds) > 0:
         #     print("DEBUG3", intermediate_preds[0][0][0])
         # else:
         #     print("DEBUG3", predfuture[0][0])
         # pdb.set_trace()
-
         intermediate_loss = torch.tensor([0.0]).to(predfuture.device)
         for k in range(self.depth):
             if k == self.depth - 1:
                 predloss = self.lossfxn(obstuple, predfuture)
             else:
+                # print(
+                #     f"""DEBUG {k}th targ: """,
+                #     targets[k].shape,
+                #     intermediate_preds[k].shape,
+                # )
                 intermediate_loss = intermediate_loss + self.lossfxn(
                     targets[k], intermediate_preds[k]
                 )
+
             # EXPERIMENTAL. Making as many M0 as possible to Eye by Lasso Loss
             if self.experimental_mode == True and k == 0:
                 LassoStrength = self.lasso_strength
@@ -430,7 +445,6 @@ class DFNFT(NFT):
                 intermediate_loss = intermediate_strength * (
                     intermediate_loss + LassoStrength * Lassoloss
                 )
-
 
         # if self.depth > 1:
         #     loss = {"all_loss": 0.0 * predloss + intermediate_loss}
