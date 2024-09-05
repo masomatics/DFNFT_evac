@@ -1,6 +1,6 @@
 trainT: 3
 evalT: 10
-itermax: 10
+itermax: 1
 report_freq: 1
 save_freq: 500
 lr: 0.00001

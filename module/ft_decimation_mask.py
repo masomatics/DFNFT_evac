@@ -54,12 +54,19 @@ class NFT(nn.Module):
                 nftadapter = input_adapter
             else:
                 nftadapter = "vanilla_input_adapter"
+            if nftadapter is None:
+                nftadapter = "vanilla_input_adapter"
+
             input_adapter_class = yu.load_module(
                 "./module/input_adapters.py", nftadapter
             )
-            self.input_adapter = input_adapter_class(
-                **kwargs, dim_data=self.encoder.dim_data
-            )
+
+            if nftadapter is not "vanilla_input_adapter":
+                self.input_adapter = input_adapter_class(
+                    **kwargs, dim_data=self.encoder.dim_data
+                )
+            else:
+                self.input_adapter = input_adapter_class(**kwargs)
 
         if self.is_Dimside == True:
             self.dynamics = dyn.DynamicsDimSide()
@@ -406,6 +413,8 @@ class DFNFT(NFT):
         # else:
         #     print("DEBUG3", predfuture[0][0])
         # pdb.set_trace()
+        loss = {}
+        predloss = torch.tensor([0.0]).to(predfuture.device)
         intermediate_loss = torch.tensor([0.0]).to(predfuture.device)
         for k in range(self.depth):
             if k == self.depth - 1:
@@ -416,9 +425,12 @@ class DFNFT(NFT):
                 #     targets[k].shape,
                 #     intermediate_preds[k].shape,
                 # )
-                intermediate_loss = intermediate_loss + self.lossfxn(
-                    targets[k], intermediate_preds[k]
-                )
+                intermediate_loss_k = self.lossfxn(targets[k], intermediate_preds[k])
+                intermediate_loss = intermediate_loss + intermediate_loss_k
+                loss[f"""Intermediate_{k}"""] = intermediate_loss_k
+                # intermediate_loss = intermediate_loss + self.lossfxn(
+                #     targets[k], intermediate_preds[k]
+                # )
 
             # EXPERIMENTAL. Making as many M0 as possible to Eye by Lasso Loss
             if self.experimental_mode == True and k == 0:
@@ -451,7 +463,7 @@ class DFNFT(NFT):
         # else:
         #     loss = {"all_loss": predloss + intermediate_loss}
 
-        loss = {"all_loss": predloss + intermediate_loss}
+        loss["all_loss"] = predloss + intermediate_loss
         loss["intermediate"] = intermediate_loss
         loss["predloss"] = predloss
         return loss

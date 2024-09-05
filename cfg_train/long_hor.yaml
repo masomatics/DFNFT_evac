@@ -1,4 +1,4 @@
-trainT: 6
+trainT: 5
 evalT: 10
 itermax: 100000
 report_freq: 10

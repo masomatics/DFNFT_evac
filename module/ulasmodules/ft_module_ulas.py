@@ -61,7 +61,7 @@ class ULASEncoder(Msqae):
         H = torch.reshape(H, (shape[0], self.dim_m, self.dim_a))
         return H
 
-    def forward(self, signal):
+    def forward(self, signal, mask=None):
         xs = signal  # (n t) c h w
         H = self._encode_base(xs, self.enc)
         # batch x time x flatten_dimen
@@ -85,7 +85,7 @@ class ULASDecoder(Msqae):
             n_blocks=self.n_blocks,
         )
 
-    def forward(self, signal):
+    def forward(self, signal, mask=None):
         H = signal
         # if hasattr(self, "change_of_basis"):
         #     H = H @ repeat(torch.linalg.inv(self.change_of_basis),

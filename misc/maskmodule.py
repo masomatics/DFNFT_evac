@@ -85,7 +85,11 @@ class SimpleStackModule(SimpleMaskModule):
         return self.lambdas
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
+        # pdb.set_trace()
+        # lambda_prev = torch.permute(lambda_prev, [1, 0])
         lambdas_next = self.forward_lambda(lambda_prev)
+        # lambdas_next = torch.permute(lambda_prev, [1, 0])
+
         dynamics_mask = self.create_mask(lambdas_next)
         if prev_mask is not None:
             dynamics_mask = dynamics_mask * prev_mask
@@ -198,9 +202,13 @@ class RotFeatureMaskModule(SimpleMaskModule):
         # in_lambda = self.lambdas
 
         out_lambdas = in_lambda
+        # out_lambdas = torch.permute(out_lambdas, [1, 0])
+
         for layer in self.rlnet:
             out_lambdas = layer(out_lambdas[None], mask=prev_mask)[0]
-        # out_lambdas = F.normalize(out_lambdas, p=2, dim=1)
+            out_lambdas = F.normalize(out_lambdas, p=2, dim=1)
+        # out_lambdas = torch.permute(out_lambdas, [1, 0])
+
         return out_lambdas
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
