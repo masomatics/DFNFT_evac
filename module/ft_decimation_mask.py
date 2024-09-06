@@ -368,7 +368,6 @@ class DFNFT(NFT):
             #     print("Debug2a", latent_pred[0][-1][0])
             #     print("Debug2b", latent[0][0][0])
             # pdb.set_trace()
-            # print(f"""DEBUG_Lshape {k} """, latent_pred.shape)
 
         intermediate_obs_preds = []
         for k in range(self.depth):
@@ -402,11 +401,6 @@ class DFNFT(NFT):
         # [X, Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth-1}(t+1)] to be compared against
         # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
         targets = [obstuple] + latent_preds[:-1]
-
-        # print("DEBUGSHAPE")
-        # for k in range(len(targets)):
-        #     print(f"""target {k}""", targets[k].shape)
-        #     print(f"""intermediate_preds {k}""", intermediate_preds[k].shape)
 
         # if len(intermediate_preds) > 0:
         #     print("DEBUG3", intermediate_preds[0][0][0])

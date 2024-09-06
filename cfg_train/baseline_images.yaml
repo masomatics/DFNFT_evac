@@ -1,6 +1,6 @@
 trainT: 5
 evalT: 10
-itermax: 200000
+itermax: 400000
 report_freq: 10
 save_freq: 50 
 device: 5

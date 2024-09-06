@@ -31,7 +31,7 @@ nftargs:
     name: RotFeatureMaskModule
     opt:
       dimVec: 16
-      depth: 3
+      depth: 6
   nftlayer: 
     fn: ./module/ft_decimation_mask
     name: NFTImages

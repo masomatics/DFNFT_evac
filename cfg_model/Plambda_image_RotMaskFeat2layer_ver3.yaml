@@ -8,11 +8,11 @@ decmodel:
   name: MM_MLPDecoder
 
 modelargs:
-  dim_data: 128
-  dim_m: 12
-  dim_a: 16
+  dim_data: 3072
+  dim_m: 16
+  dim_a: 128
   depth: 3
-  hidden_dim: 240
+  hidden_dim: 1024
   predictive: True
   transition_model: LS
   activation: tanh
@@ -23,15 +23,15 @@ nftmodel:
 
 nftargs:
   orth_proj: False
-  depth: 3
+  depth: 2
   is_Dimside: False
   lambda_strength: 0.0
-  input_adapter: vanilla_input_adapter
+  input_adapter: image2mlp_adapter
   plambdanet: 
     name: RotFeatureMaskModule
     opt:
-      dimVec: 12
-      depth: 3
+      dimVec: 16
+      depth: 6
   nftlayer: 
     fn: ./module/ft_decimation_mask
-    name: NFT
+    name: NFTImages
