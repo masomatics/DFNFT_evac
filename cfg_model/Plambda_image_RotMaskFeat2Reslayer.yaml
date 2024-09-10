@@ -1,0 +1,37 @@
+#root: /tmp/datasets/MNIST
+encmodel:
+  fn: ./module/mlp_lambda_mask
+  name: MM_ResMLPEncoder
+
+decmodel:
+  fn: ./module/mlp_lambda_mask
+  name: MM_ResMLPDecoder
+
+modelargs:
+  dim_data: 3072
+  dim_m: 16
+  dim_a: 128
+  depth: 3
+  hidden_dim: 2048,2048,1024
+  predictive: True
+  transition_model: LS
+  activation: tanh
+
+nftmodel: 
+  fn: ./module/ft_decimation_mask
+  name: DFNFT
+
+nftargs:
+  orth_proj: False
+  depth: 2
+  is_Dimside: False
+  lambda_strength: 0.0
+  input_adapter: image2mlp_adapter
+  plambdanet: 
+    name: RotFeatureMaskModule
+    opt:
+      dimVec: 16
+      depth: 6
+  nftlayer: 
+    fn: ./module/ft_decimation_mask
+    name: NFTImages

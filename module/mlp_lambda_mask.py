@@ -144,6 +144,32 @@ class MM_MLPEncoder(MM_MLP_AE):
         return H
 
 
+class MM_ResMLPEncoder(MM_MLPEncoder):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def forward(self, signal, mask=None):
+        H = signal
+        if not self.require_input_adapter:
+            H = rearrange(signal, "... d m -> ... (d m)")
+
+        for k in range(len(self.net)):
+            layer = self.net[k]
+            Hold = H
+            Hold_shape = H.shape
+            if isinstance(layer, MM_MaskFlatLinear):
+                H = layer(H, mask)
+            else:
+                H = layer(H)
+
+            if Hold_shape == H.shape and k < len(self.net) - 1:
+                H = H + Hold
+                H = self.activation_fxn(H)
+
+        H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
+        return H
+
+
 class MM_MLPDecoder(MM_MLP_AE):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -185,4 +211,25 @@ class MM_MLPDecoder(MM_MLP_AE):
                 H = layer(H, mask)
             else:
                 H = layer(H)
+        return H
+
+
+class MM_ResMLPDecoder(MM_MLPDecoder):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def forward(self, xs, mask=None):
+        H = xs.reshape([xs.shape[0], -1])
+        for k in range(len(self.net)):
+            layer = self.net[k]
+            Hold = H
+            Holdshape = Hold.shape
+            if isinstance(layer, mn.MaskFlatLinear):
+                H = layer(H, mask)
+            else:
+                H = layer(H)
+
+            if Holdshape == H.shape and k < len(self.net) - 1:
+                H = H + Hold
+                H = self.activation_fxn(H)
         return H

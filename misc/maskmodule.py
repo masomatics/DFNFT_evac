@@ -14,7 +14,7 @@ sys.path.append("./")
 sys.path.append("./module")
 
 from module import RotatingLayers as rl
-import omegaconf
+from omegaconf import OmegaConf
 from module import mlp_lambda_mask as mlm
 
 
@@ -24,7 +24,7 @@ Mask determined at each layer independently.
 
 
 class SimpleMaskModule(nn.Module):
-    def __init__(self, dimRep: int, dimVec: int, **kwargs):
+    def __init__(self, dimRep: int, dimVec: int, lambda_heat=1.0, **kwargs):
         super().__init__()
         self.dimRep = dimRep
         self.dimVec = dimVec
@@ -38,6 +38,7 @@ class SimpleMaskModule(nn.Module):
         self.lambdas = nn.Parameter(lambdainitial)
         self.own_mask = None  # OWN MASK IS A PREV MASK, to be used by Decoder
         self.dynamics_mask = None
+        self.lambda_heat = lambda_heat
 
     def compute_delta(self, lambdas):
         lambdas_expand_one = lambdas.unsqueeze(1)
@@ -49,7 +50,7 @@ class SimpleMaskModule(nn.Module):
     def create_mask(self, lambdas=None, **kwargs):
         if lambdas is None:
             lambdas = self.lambdas
-        lambdamask = torch.exp(self.compute_delta(lambdas))
+        lambdamask = torch.exp(self.lambda_heat * self.compute_delta(lambdas))
         return lambdamask  # This will be used for the next / dynamic mask.
 
     def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
@@ -72,6 +73,26 @@ class SimpleMaskModule(nn.Module):
     # Default ignores the in_lambda, and uses its "own" lambda.
     def forward_lambda(self, in_lambda=None):
         return self.lambdas
+
+
+"""
+NO mask at all. 
+"""
+
+
+class VanillaMaskModule(SimpleMaskModule):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        lambdainitial = torch.ones(self.dimRep, self.dimVec)
+        self.lambdas = nn.Parameter(lambdainitial, requires_grad=False)
+
+    @property
+    def device(self):
+        return self.lambdas.device
+
+    def create_mask(self, lambdas=None):
+        vanilla_mask = torch.ones(self.dimVec, self.dimVec).to(self.device)
+        return vanilla_mask
 
 
 """
@@ -213,7 +234,9 @@ class RotFeatureMaskModule(SimpleMaskModule):
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
         lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
-        # print("DEBUG LM", lambdas_next)
+        # print("DEBUG LM", lambdas_next[0])
+        # print("DEBUG LM", prev_mask)
+
         # pdb.set_trace()
         dynamics_mask = self.create_mask(lambdas_next)
         # if prev_mask is None:
@@ -221,6 +244,42 @@ class RotFeatureMaskModule(SimpleMaskModule):
         # else:
         #     dynamics_mask = self.create_mask(lambdas_next) * prev_mask
         return dynamics_mask, lambdas_next
+
+
+class RotFeatureMaskCosine(RotFeatureMaskModule):
+    def create_mask(self, lambdas=None, **kwargs):
+        if lambdas is None:
+            lambdas = self.lambdas
+
+        lambdas = F.normalize(lambdas, p=2, dim=1)
+        lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
+        return lambdamask  # This will be used for the next / dynamic mask.
+
+
+class RotFeatureMaskExpCosine(RotFeatureMaskModule):
+    def create_mask(self, lambdas=None, **kwargs):
+        if lambdas is None:
+            lambdas = self.lambdas
+
+        lambdas = F.normalize(lambdas, p=2, dim=1)
+        lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
+        lambdamask = torch.exp(
+            lambdamask - 1.0
+        )  # This will be used for the next / dynamic mask.
+        return lambdamask
+
+
+# class RotFeatureMaskSoftCosine(RotFeatureMaskModule):
+#     def create_mask(self, lambdas=None, **kwargs):
+#         if lambdas is None:
+#             lambdas = self.lambdas
+
+#         lambdas = F.normalize(lambdas, p=2, dim=1)
+#         lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
+#         lambdamask = F.softmax(
+#             -lambdamask
+#         )  # This will be used for the next / dynamic mask.
+#         return lambdamask
 
 
 class RotFeatureMindLessModule(SimpleMaskModule):

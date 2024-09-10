@@ -461,3 +461,33 @@ class DFNFT(NFT):
         loss["intermediate"] = intermediate_loss
         loss["predloss"] = predloss
         return loss
+
+
+class DFNFT_ownDec(DFNFT):
+    def __init__(self, nftlist: list[NFT], owndecoders: list = [], **kwargs):
+        super().__init__(nftlist=nftlist, owndecoders=owndecoders, **kwargs)
+        assert len(owndecoders) > 0
+        self.owndecoders = nn.ModuleList(owndecoders)
+
+    def intermediate_decode(self, latent, layer_idx=0):
+        # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
+        loc = layer_idx
+        kth_latent = latent[loc]
+        # print(f"""DEBUG {loc}th Latent: """, kth_latent.shape)
+        batchsize, ts, m, a = kth_latent.shape
+
+        kth_latent = rearrange(kth_latent, "n t ... -> (n t) ...")
+
+        """
+        TODO : THIS PART IS VERY ERROR PRONE, much is Copied from 
+        original intermediate_decode
+        """
+        decoder_mask = self.nftlayers[loc].PLambdaNet.own_mask
+        kth_latent = self.owndecoders[loc](kth_latent, mask=decoder_mask)
+        kth_latent = self.nftlayers[loc].input_adapter.deforward(kth_latent)
+        kplus1th_latent = rearrange(kth_latent, "(n t) ... -> n t ...", n=batchsize)
+
+        if loc > 0:
+            kplus1th_latent = rearrange(kplus1th_latent, "n t (m a) -> n t m a", m=m)
+
+        return kplus1th_latent

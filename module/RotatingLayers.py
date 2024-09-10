@@ -12,6 +12,12 @@ from einops import rearrange, einsum, repeat
 from torch.nn import functional as F
 import pdb
 
+"""
+This is an excerpt from 
+https://github.com/loeweX/RotatingFeatures
+
+"""
+
 
 def apply_layer_to_rotating_features(
     opt: DictConfig,
@@ -265,7 +271,6 @@ class RotatingMaskLinear(nn.Module):
             torch.empty((1, opt.rotation_dimensions, out_features))
         )
         self.rotation_bias = init_rotation_bias(self.fan_in, self.rotation_bias)
-
         self.norm = nn.LayerNorm(out_features, elementwise_affine=True)
 
     def forward(self, x: Tensor, mask: Tensor) -> Tensor:

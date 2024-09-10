@@ -71,6 +71,11 @@ def spectrum(mymodel, myloader, mywriter, step, device):
         if mymodel.depth > 1:
             for k in range(10):
                 evalseq, shift = next(iter(myloader))
+
+                ########
+                evalseq = evalseq[:20]
+                shift = shift[:20]
+                ######
                 evalseq = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
                 predicted = mymodel(evalseq, n_rolls=1)
                 shifts.append(shift)

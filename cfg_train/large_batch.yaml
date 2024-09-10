@@ -1,0 +1,9 @@
+trainT: 3
+evalT: 10
+itermax: 30000
+report_freq: 10
+save_freq: 50 
+lr: 0.00001
+batchsize: 600
+debug: False
+seed: 0
