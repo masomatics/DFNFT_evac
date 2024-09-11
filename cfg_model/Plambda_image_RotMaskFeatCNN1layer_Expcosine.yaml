@@ -1,0 +1,36 @@
+#root: /tmp/datasets/MNIST
+encmodel:
+  fn: ./module/ulasmodules/ft_module_ulas
+  name: ULASEncoderLayer
+
+decmodel:
+  fn: ./module/ulasmodules/ft_module_ulas
+  name: ULASDecoder
+
+modelargs:
+  dim_m: 16   #This is designed for Left action
+  dim_a: 128   #This is designed for Right action
+  ch_x: 3
+  k: 2.
+  predictive: True
+  detachM: 0
+  n_blocks: 3   #originally 4
+
+nftmodel: 
+  fn: ./module/ft_decimation_mask
+  name: DFNFT
+
+nftargs:
+  orth_proj: False
+  depth: 1
+  is_Dimside: False
+  lambda_strength: 0.0
+  input_adapter: 
+  plambdanet: 
+    name: RotFeatureMaskExpCosine
+    opt:
+      dimVec: 16
+      depth: 6
+  nftlayer: 
+    fn: ./module/ft_decimation_mask
+    name: NFTImages

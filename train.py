@@ -39,18 +39,57 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
-    modelname = "Plambda_OneD_RotMaskFeat1layer"
-    # modelname = "Plambda_OneD_RotMaskFeat2layer"
+    # modelname = "Plambda_OneD_RotMaskFeat1layer_ver2"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_debug"
+    # modelname = "Plambda_OneD_RotMaskFeat2layerDeep"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat1layer_Expcosine"
 
+    # modelname = "Plambda_OneD_RotMaskFeat2layer"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer"
+
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_ownDec"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_ownDec"
+    # modelname = "RotLin_OneD_1layer"
+
+    # modelname = "Plambda_OneD_RotMaskFeat3layer"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_debug"
+
+    # modelname = "Plambda_OneD_RotFeat2layer"
+    # modelname = "Plambda_OneD_RotFeat3layer"
     # modelname = "Plambda_OneD_RotFeat1layer_ver7"
 
-    datname = "OneDsignal_c8mimic_lowpow"
-    trainname = "faster"
-    # trainname = "faster"
+    # datname = "OneDsignal_c8mimic_lowpow"
+    datname = "OneDsignal_highlow8m"
+    # datname = "OneDsignal_c8mimic"   #Should run with c8mimic
 
+    # trainname = "faster"
+    trainname = "evenfaster"
+    # trainname = "large_batch"
+
+    # trainname = "baseline"
+    # trainname = "long_hor"
+
+    # trainname = "debug"
+    ########
+
+    # IMAGES
     # modelname = "CNN"
-    # datname = "DoubleDat"
-    # trainname = "baseline_images"
+    # modelname = "Plambda_image_RotMaskFeatCNN1layer"
+    # modelname = "Plambda_image_RotMaskFeat1layer"
+    # modelname = "Plambda_image_RotMaskFeat2layer_ver2"
+    # modelname = "Plambda_image_RotMaskFeat1Reslayer"
+
+    # modelname = "Plambda_image_RotMaskFeat2Reslayer"
+
+    # modelname = "Plambda_image_RotMaskFeat1layer_Expcosine"
+    modelname = "Plambda_image_RotMaskFeatCNN1layer_Expcosine"
+    datname = "DoubleDat"
+    trainname = "baseline_images"
+    ##########
+
     mode = "_".join([datname, modelname, trainname])
 
     with open(f"""./cfg_model/{modelname}.yaml""", "rb") as f:
@@ -69,7 +108,7 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 6
+    configs["train"]["device"] = 5
 
     trainer = DF_Trainer(configs)
     trainer.train()
@@ -356,10 +395,16 @@ class DF_Trainer(object):
     def args_layerwise(self, baseargs, layer):
         baseargs_k = copy.deepcopy(baseargs)
         for key in baseargs_k.keys():
-            if "," in key:
-                vals = key.split(",")
-                baseargs_k[key] = vals[layer]
+            if "," in str(baseargs_k[key]) and not isinstance(baseargs_k[key], dict):
+                vals = str(baseargs_k[key]).split(",")
+                baseargs_k[key] = self.safe_convert_to_int(vals[layer])
         return baseargs_k
+
+    def safe_convert_to_int(self, s):
+        if s.isdigit():
+            return int(s)
+        else:
+            return None
 
 
 if __name__ == "__main__":
