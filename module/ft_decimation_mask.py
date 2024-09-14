@@ -370,12 +370,22 @@ class DFNFT(NFT):
             # pdb.set_trace()
 
         intermediate_obs_preds = []
-        for k in range(self.depth):
+
+        # the LAST intemediate latens won't be used, it is almost the recomputationg of the
+        # entire decoding process from the bottom
+        for k in range(self.depth - 1):
             kplus1latent_pred = self.intermediate_decode(latent_preds, layer_idx=k)
             intermediate_obs_preds.append(kplus1latent_pred)
-            # print("DEBUG_PRED", kplus1latent_pred[0][-1][:10])
         # [Z0, Z1, Z2, Z3, ... ] ->  [Psi_k(Z_k) ; k = 0, 1, 2, ...  ]
 
+        # print(
+        #     "DEBUG",
+        #     [
+        #         intermediate_obs_preds[k].shape
+        #         for k in range(len(intermediate_obs_preds))
+        #     ],
+        # )
+        # pdb.set_trace()
         infer_pred = self.do_decode(latent_preds[-1])
 
         # if self.depth == 1:
@@ -413,12 +423,24 @@ class DFNFT(NFT):
         for k in range(self.depth):
             if k == self.depth - 1:
                 predloss = self.lossfxn(obstuple, predfuture)
+
+                print(
+                    f"""DEBUG Predfuture: {predfuture.shape}, {predfuture[0][-1][:10]}  """
+                )
             else:
                 # print(
                 #     f"""DEBUG {k}th targ: """,
                 #     targets[k].shape,
                 #     intermediate_preds[k].shape,
                 # )
+
+                if k > 0:
+                    forshow = intermediate_preds[k][0][-1][0]
+                else:
+                    forshow = intermediate_preds[k][0][-1][:10]
+                print(
+                    f"""DEBUG Intermediate [{k}] Used : {intermediate_preds[k].shape, forshow} """
+                )
                 intermediate_loss_k = self.lossfxn(targets[k], intermediate_preds[k])
                 intermediate_loss = intermediate_loss + intermediate_loss_k
                 loss[f"""Intermediate_{k}"""] = intermediate_loss_k
@@ -456,6 +478,86 @@ class DFNFT(NFT):
         #     loss = {"all_loss": 0.0 * predloss + intermediate_loss}
         # else:
         #     loss = {"all_loss": predloss + intermediate_loss}
+
+        loss["all_loss"] = predloss + intermediate_loss
+        loss["intermediate"] = intermediate_loss
+        loss["predloss"] = predloss
+        return loss
+
+
+class DFNFT_thruDec(DFNFT):
+    def intermediate_decode(self, latent, layer_idx=0):
+        # if layer_idx_from_bottom = 1 and depth=3, then it shall evaluate nftlayers[1]
+        loc = layer_idx
+        kth_latent = latent[loc]
+        # print(f"""DEBUG {loc}th Latent: """, kth_latent.shape)
+        batchsize, ts, m, a = kth_latent.shape
+
+        k_minus_upidx_latent = kth_latent
+
+        """
+        0 ->  -1 (obs-space)
+        1 ->  0  -> -1 
+        2 ->  1  ->  0 -> -1 
+        """
+        for upidx in range(loc + 1):
+            currentloc = loc - upidx
+            k_minus_upidx_latent = rearrange(
+                k_minus_upidx_latent, "n t ... -> (n t) ..."
+            )
+            decoder_mask = self.nftlayers[currentloc].PLambdaNet.own_mask
+            k_minus_upidx_latent = self.nftlayers[currentloc].decoder(
+                k_minus_upidx_latent, mask=decoder_mask
+            )
+            k_minus_upidx_latent = self.nftlayers[currentloc].input_adapter.deforward(
+                k_minus_upidx_latent
+            )
+            k_minus_upidx_latent = rearrange(
+                k_minus_upidx_latent, "(n t) ... -> n t ...", n=batchsize
+            )
+
+            if currentloc > 0:
+                k_minus_upidx_latent = rearrange(
+                    k_minus_upidx_latent, "n t (m a) -> n t m a", m=m
+                )
+
+        return k_minus_upidx_latent
+
+    def loss(self, obstuple, n_rolls=1):
+        # predinput = obstuple[:, :-1]  # X0 X1   <--Call uses 0 and 1, this is unncessary
+        predinput = obstuple[:, :2]
+        # With the understanding that Z0 = Phi_0(X), Z^{-1} = X,
+        # Xhat(t+1),   [Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth}(t+1)] ,
+        # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
+        predfuture, latent_preds, intermediate_preds = self(predinput, n_rolls)
+
+        # [X, Z^{0}(t+1) Z^{1}(t+1),..., Z^{depth-1}(t+1)] to be compared against
+        # [hatZ^{-1}(t+1), hatZ^{0}(t+1), ..., Z^{depth-1}(t+1) ]
+        targets = [obstuple] * len(latent_preds)
+
+        # if len(intermediate_preds) > 0:
+        #     print("DEBUG3", intermediate_preds[0][0][0])
+        # else:
+        #     print("DEBUG3", predfuture[0][0])
+        # pdb.set_trace()
+        loss = {}
+        predloss = torch.tensor([0.0]).to(predfuture.device)
+        intermediate_loss = torch.tensor([0.0]).to(predfuture.device)
+        for k in range(self.depth):
+            if k == self.depth - 1:
+                predloss = self.lossfxn(obstuple, predfuture)
+                # print(
+                #     f"""DEBUG Predfuture: {predfuture.shape}, {predfuture[0][-1][:10]}  """
+                # )
+
+            else:
+                # forshow = intermediate_preds[k][0][-1][:10]
+                # print(
+                #     f"""DEBUG Intermediate [{k}] Used : {intermediate_preds[k].shape, forshow} """
+                # )
+                intermediate_loss_k = self.lossfxn(targets[k], intermediate_preds[k])
+                intermediate_loss = intermediate_loss + intermediate_loss_k
+                loss[f"""Intermediate_{k}"""] = intermediate_loss_k
 
         loss["all_loss"] = predloss + intermediate_loss
         loss["intermediate"] = intermediate_loss
