@@ -53,16 +53,21 @@ class SimpleMaskModule(nn.Module):
         lambdamask = torch.exp(self.lambda_heat * self.compute_delta(lambdas))
         return lambdamask  # This will be used for the next / dynamic mask.
 
+    """
+    THIS IS THE CORE PART OF PLAMBDANET
+    """
+
     def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
         self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to zero, to be used by "encoder/decoder. "
+
         dynamics_mask, lambdas_next = self.forward_mask(
-            lambda_prev=None, prev_mask=prev_mask, **kwargs
+            lambda_prev=lambda_prev, prev_mask=prev_mask, **kwargs
         )
         self.dynamics_mask = dynamics_mask  # THIS LINE IS REQUIRED AT ALL TIME.
         return dynamics_mask, lambdas_next
 
     def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
-        lambdas_next = self.forward_lambda(lambda_prev)
+        lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
         dynamics_mask = self.create_mask(lambdas_next)
         return dynamics_mask, lambdas_next
 
@@ -131,16 +136,6 @@ class SimpleRotModule(SimpleStackModule):
     def forward_lambda(self, in_lambda=None):
         out_lambdas = F.normalize(self.lambdas, p=2, dim=1)
         return out_lambdas
-
-    # def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
-    #     self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to None, to be used by "encoder/decoder. "
-    #     lambdas_next = self.forward_lambda(lambda_prev)
-    #     dynamics_mask = self.create_mask(lambdas_next)
-    #     if prev_mask is not None:
-    #         dynamics_mask = dynamics_mask * prev_mask
-    #     self.dynamics_mask = dynamics_mask  # THIS LINE IS REQUIRED AT ALL TIME
-
-    #     return dynamics_mask, lambdas_next  # This will be used for dynamics.
 
 
 """
@@ -232,17 +227,17 @@ class RotFeatureMaskModule(SimpleMaskModule):
 
         return out_lambdas
 
-    def forward_mask(self, lambda_prev=None, prev_mask=None, **kwargs):
+    def forward_mask(self, lambda_prev=None, prev_mask=None, threshold=0.5, **kwargs):
         lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
-        # print("DEBUG LM", lambdas_next[0])
-        # print("DEBUG LM", prev_mask)
 
-        # pdb.set_trace()
         dynamics_mask = self.create_mask(lambdas_next)
+
         if prev_mask is None:
             dynamics_mask = self.create_mask(lambdas_next)
         else:
-            dynamics_mask = self.create_mask(lambdas_next) * prev_mask
+            dynamics_mask = (
+                self.create_mask(lambdas_next) * prev_mask * (prev_mask > threshold)
+            )
         return dynamics_mask, lambdas_next
 
 
@@ -253,19 +248,84 @@ class RotFeatureMaskCosine(RotFeatureMaskModule):
 
         lambdas = F.normalize(lambdas, p=2, dim=1)
         lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
+        lambdamask = lambdamask**2
         return lambdamask  # This will be used for the next / dynamic mask.
+
+    def forward_mask(self, lambda_prev=None, prev_mask=None, threshold=0.0, **kwargs):
+        # STILL CHOOSING THE FORWARD LAMBDA USAGE
+        lambdas_next = self.forward_lambda(None, prev_mask=prev_mask)
+        # if lambda_prev is not None:
+        #     lambdas_next = lambdas_next + lambda_prev
+
+        # if lambda_prev is not None:
+        #     lambdas_input = self.lambdas + lambda_prev
+        # else:
+        #     lambdas_input = self.lambdas
+        # lambdas_next = self.forward_lambda(lambdas_input, prev_mask=prev_mask)
+
+        # if lambda_prev is not None:
+        #     lambdas_next = (
+        #         self.forward_lambda(lambda_prev, prev_mask=prev_mask) + self.lambdas
+        #     )
+        # else:
+        #     lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
+
+        dynamics_mask = self.create_mask(lambdas_next)
+
+        if prev_mask is None:
+            dynamics_mask = self.create_mask(lambdas_next)
+        else:
+            dynamics_mask = (
+                self.create_mask(lambdas_next) * prev_mask * (prev_mask > threshold)
+            )
+        return dynamics_mask, lambdas_next
+
+
+class RotFeatureMaskExpCosineTwo(RotFeatureMaskModule):
+    def create_mask(self, lambdas=None, **kwargs):
+        if lambdas is None:
+            lambdas = self.lambdas
+
+        # lambdas = F.normalize(lambdas, p=2, dim=1)
+        lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
+        # lambdamask = torch.abs(lambdamask)
+        lambdamask = torch.sigmoid(lambdamask)
+        # lambdamask = torch.exp(lambdamask) - 1
+        return lambdamask  # This will be used for the next / dynamic mask.
+
+    def forward_mask(self, lambda_prev=None, prev_mask=None, threshold=0.5, **kwargs):
+        # STILL CHOOSING THE FORWARD LAMBDA USAGE
+        lambdas_next = self.forward_lambda(None, prev_mask=prev_mask)
+        if lambda_prev is not None:
+            lambdas_next = lambdas_next + lambda_prev
+
+        # if lambda_prev is not None:
+        #     lambdas_next = (
+        #         self.forward_lambda(lambda_prev, prev_mask=prev_mask) + lambda_prev
+        #     )
+        # else:
+        #     lambdas_next = self.forward_lambda(lambda_prev, prev_mask=prev_mask)
+
+        dynamics_mask = self.create_mask(lambdas_next)
+
+        if prev_mask is None:
+            dynamics_mask = self.create_mask(lambdas_next)
+        else:
+            dynamics_mask = self.create_mask(lambdas_next) * prev_mask
+        return dynamics_mask, lambdas_next
 
 
 class RotFeatureMaskExpCosine(RotFeatureMaskModule):
-    def create_mask(self, lambdas=None, **kwargs):
+    def create_mask(self, lambdas=None, maskheat=1.0, **kwargs):
         if lambdas is None:
             lambdas = self.lambdas
 
         lambdas = F.normalize(lambdas, p=2, dim=1)
         lambdamask = lambdas @ torch.permute(lambdas, [1, 0])
         lambdamask = torch.exp(
-            lambdamask - 1.0
+            maskheat * (lambdamask - 1.0)
         )  # This will be used for the next / dynamic mask.
+
         return lambdamask
 
 

@@ -57,6 +57,96 @@ def plot_to_image(fig):
 def spectrum(mymodel, myloader, mywriter, step, device):
     current_time = time.localtime()
     current_date = time.strftime("%Y-%m-%d-%H:%M", current_time)
+    mydata = myloader.dataset
+
+    Ms = {}
+    shifts = []
+    modelpreds = {}
+
+    if hasattr(mymodel, "nftlayers"):
+        mynft = mymodel.nftlayers[0]
+    else:
+        mynft = mymodel
+
+    for j in range(mymodel.depth):
+        Ms[j] = []
+        modelpreds[j] = None
+
+    for k in range(10):
+        evalseq, shift = next(iter(myloader))
+        evalT = evalseq.shape[1]
+        ########
+        evalseq = evalseq[:20]
+        shift = shift[:20]
+        ######
+        shifts.append(shift)
+
+        predinput = evalseq[:, :2].to(mymodel.nftlayers[0].encoder.device)
+        n_rolls = evalT - 1
+        predfuture, latent_preds, intermediate_preds = mymodel(predinput, n_rolls)
+        for j in range(mymodel.depth):
+            Ms[j].append(mymodel.nftlayers[j].dynamics.M.detach())
+
+    for j in range(mymodel.depth):
+        if j < mymodel.depth - 1:
+            modelpreds[j] = intermediate_preds[j]
+        else:
+            modelpreds[j] = predfuture
+        Ms[j] = torch.concatenate(Ms[j]).detach().to("cpu")
+
+    myfreqs = np.array(mydata.freqsel)
+    maxfreq = np.max(myfreqs)
+    shifts = torch.concatenate(shifts)
+
+    plt.figure(figsize=(10 * mymodel.depth, 10))
+    prods = {}
+
+    for j in range(mymodel.depth):
+        targfreq, prods_j = ca.inner_prod(
+            Ms[j].to(shifts.device), shifts, maxfreq=maxfreq, bins=maxfreq + 1
+        )
+        prods[j] = prods_j
+        plt.subplot(1, mymodel.depth, j + 1)
+        deltas = ca.deltafxn(targfreq, mydata.freqsel) * 2
+
+        plt.plot(
+            targfreq,
+            prods_j,
+            label=f"""Level{j}:""" + str(np.where(prods_j > 1.0)[0]),
+            alpha=0.8,
+        )
+        plt.plot(
+            targfreq,
+            deltas,
+            alpha=0.2,
+            label="gt:" + str(np.where(deltas > 1.0)[0]),
+        )
+
+        plt.legend()
+    plt.title(str(np.sort(myfreqs)) + current_date)
+
+    mywriter.add_figure("Spectrum Each", plt.gcf(), global_step=step)
+
+    if hasattr(mymodel, "nftlayers"):
+        for k in range(mymodel.depth):
+            matrixMeanshape = torch.mean(
+                torch.abs(mymodel.nftlayers[k].dynamics.M.detach()), axis=0
+            )
+
+            plt.imshow(matrixMeanshape.to("cpu"))
+            mywriter.add_figure(
+                f""" Matrix Meanshape Layer {k} """, plt.gcf(), global_step=step
+            )
+    else:
+        matrixMeanshape = torch.mean(torch.abs(mynft.dynamics.M.detach()), axis=0)
+
+        plt.imshow(matrixMeanshape.to("cpu"))
+        mywriter.add_figure(f""" Matrix Meanshape""", plt.gcf(), global_step=step)
+
+
+def spectrum_old(mymodel, myloader, mywriter, step, device):
+    current_time = time.localtime()
+    current_date = time.strftime("%Y-%m-%d-%H:%M", current_time)
 
     mydata = myloader.dataset
     Ms = {0: [], 1: []}

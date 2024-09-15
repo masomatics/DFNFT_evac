@@ -16,6 +16,7 @@ from module import ft_decimation as ftd
 import pdb
 from misc import yaml_util as yu
 from misc import spectrum_evaluate as sev
+from misc import get_gpu
 # from module import ft_module_from_dimside as ftdim
 
 
@@ -42,9 +43,18 @@ def main():
     # modelname = "Plambda_OneD_RotMaskFeat1layer_ver2"
     # modelname = "Plambda_OneD_RotMaskFeat2layer_debug"
     # modelname = "Plambda_OneD_RotMaskFeat2layerDeep"
-    # modelname = "Plambda_OneD_RotMaskFeat2layer_Expcosine"
-    # modelname = "Plambda_OneD_RotMaskFeat3layer_Expcosine"
+
     # modelname = "Plambda_OneD_RotMaskFeat1layer_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_thruDec_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat2layer_thruDec_cosine"
+    modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_cosine"
+
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_Expcosine"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_ExpcosineTwo"
+
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_cosine"
 
     # modelname = "Plambda_OneD_RotMaskFeat2layer"
     # modelname = "Plambda_OneD_RotMaskFeat2layer"
@@ -63,7 +73,7 @@ def main():
 
     # datname = "OneDsignal_c8mimic_lowpow"
     datname = "OneDsignal_highlow8m"
-    # datname = "OneDsignal_c8mimic"   #Should run with c8mimic
+    # datname = "OneDsignal_c8mimic"  # Should run with c8mimic
 
     # trainname = "faster"
     trainname = "evenfaster"
@@ -85,9 +95,9 @@ def main():
     # modelname = "Plambda_image_RotMaskFeat2Reslayer"
 
     # modelname = "Plambda_image_RotMaskFeat1layer_Expcosine"
-    modelname = "Plambda_image_RotMaskFeatCNN1layer_Expcosine"
-    datname = "DoubleDat"
-    trainname = "baseline_images"
+    # modelname = "Plambda_image_RotMaskFeatCNN1layer_Expcosine"
+    # datname = "DoubleDat"
+    # trainname = "baseline_images"
     ##########
 
     mode = "_".join([datname, modelname, trainname])
@@ -108,7 +118,8 @@ def main():
     configs["data"] = cfg_data
     configs["expname"] = mode
 
-    configs["train"]["device"] = 5
+    configs["train"]["device"] = get_gpu.get_least_used_gpu()
+    print(f"""Chose device {configs["train"]["device"] } """)
 
     trainer = DF_Trainer(configs)
     trainer.train()

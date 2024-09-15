@@ -196,25 +196,31 @@ class NFT(nn.Module):
         print("""!!! Visualization Rendered!!! """)
         self.visualize(evalseq, predicted, writer, step)
 
-    def visualize(self, evalseq, predicted, writer, step):
+    def visualize(self, evalseq, predicted, writer, step, addendum=""):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
         # Prediction at -1
-        plt.figure(figsize=(20, 10))
+        plt.figure(figsize=(40, 10))
+
+        plt.subplot(1, 2, 1)
+        timeidx = 1
+        plt.plot(evalseq[timeidx], label="gt")
+        plt.plot(predicted[timeidx], label="pred")
+        plt.legend()
+
+        # writer.add_figure(
+        #     f"""gt vs predicted t={len(evalseq)}: {addendum}""",
+        #     plt.gcf(),
+        #     global_step=step,
+        # )
+        plt.subplot(1, 2, 2)
         plt.plot(evalseq[-1], label="gt")
         plt.plot(predicted[-1], label="pred")
         plt.legend()
         writer.add_figure(
-            f"""gt vs predicted t={len(evalseq)}""", plt.gcf(), global_step=step
-        )
-
-        timeidx = 1
-        plt.figure(figsize=(20, 10))
-        plt.plot(evalseq[timeidx], label="gt")
-        plt.plot(predicted[timeidx], label="pred")
-        plt.legend()
-        writer.add_figure(
-            f"""gt vs predicted t={timeidx}""", plt.gcf(), global_step=step
+            f"""gt vs predicted t={timeidx, len(evalseq)}: {addendum}""",
+            plt.gcf(),
+            global_step=step,
         )
 
 
@@ -225,7 +231,7 @@ class NFTImages(NFT):
         )
         return errval
 
-    def visualize(self, evalseq, predicted, writer, iteridx):
+    def visualize(self, evalseq, predicted, writer, iteridx, addendum=""):
         predicted = predicted[0].to("cpu")
         evalseq = evalseq[0].to("cpu")
 
@@ -239,7 +245,7 @@ class NFTImages(NFT):
         print(torch.min(predicted), torch.max(predicted))
         plt.suptitle(f"""loss mse: {evalloss}""")
 
-        writer.add_figure("gt vs predicted", plt.gcf(), global_step=iteridx)
+        writer.add_figure("gt vs predicted" + addendum, plt.gcf(), global_step=iteridx)
 
 
 class DFNFT(NFT):
@@ -563,6 +569,38 @@ class DFNFT_thruDec(DFNFT):
         loss["intermediate"] = intermediate_loss
         loss["predloss"] = predloss
         return loss
+
+    def evaluate(self, evalseq, writer, device, step):
+        b, t = evalseq.shape[0], evalseq.shape[1]
+        initialpair = evalseq[:, :2].to(device)
+        rolllength = t - 1
+        predicted, latent_preds, intermediate_preds = self(
+            initialpair, n_rolls=rolllength
+        )
+        predicted = predicted.detach()
+        print("""!!! Visualization Rendered!!! """)
+
+        for j in range(self.depth):
+            if j == self.depth - 1:
+                evalhat = predicted
+            else:
+                evalhat = intermediate_preds[j].detach().to("cpu")
+            self.nftlayers[0].visualize(
+                evalseq, evalhat, writer, step, f"""{j}th layer"""
+            )
+
+        plt.figure()
+        for k in range(self.depth):
+            plt.subplot(1, self.depth, k + 1)
+            if self.nftlayers[k].PLambdaNet.dynamics_mask is not None:
+                plt.imshow(
+                    self.nftlayers[k].PLambdaNet.dynamics_mask.detach().to("cpu")
+                )
+            else:
+                print("Mask is None at this point yet")
+            plt.title(f"""Layer{k} Matrix Mask""")
+
+        writer.add_figure("Dynamic Masks", plt.gcf(), global_step=step)
 
 
 class DFNFT_ownDec(DFNFT):
