@@ -40,6 +40,8 @@ def main():
     # datname = "OneDsignal_OddEven_wide"
     # trainname = "slower"
 
+    modelname = "RotLin_OneD_1layer"
+
     # modelname = "Plambda_OneD_RotMaskFeat1layer_ver2"
     # modelname = "Plambda_OneD_RotMaskFeat2layer_debug"
     # modelname = "Plambda_OneD_RotMaskFeat2layerDeep"
@@ -48,7 +50,7 @@ def main():
     # modelname = "Plambda_OneD_RotMaskFeat2layer_Expcosine"
     # modelname = "Plambda_OneD_RotMaskFeat2layer_thruDec_Expcosine"
     # modelname = "Plambda_OneD_RotMaskFeat2layer_thruDec_cosine"
-    modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_cosine"
+    # modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_cosine"
 
     # modelname = "Plambda_OneD_RotMaskFeat3layer_Expcosine"
     # modelname = "Plambda_OneD_RotMaskFeat3layer_thruDec_Expcosine"
@@ -71,8 +73,8 @@ def main():
     # modelname = "Plambda_OneD_RotFeat3layer"
     # modelname = "Plambda_OneD_RotFeat1layer_ver7"
 
-    # datname = "OneDsignal_c8mimic_lowpow"
-    datname = "OneDsignal_highlow8m"
+    datname = "OneDsignal_c8mimic_lowpow"
+    # datname = "OneDsignal_highlow8m"
     # datname = "OneDsignal_c8mimic"  # Should run with c8mimic
 
     # trainname = "faster"

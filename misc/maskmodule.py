@@ -39,6 +39,7 @@ class SimpleMaskModule(nn.Module):
         self.own_mask = None  # OWN MASK IS A PREV MASK, to be used by Decoder
         self.dynamics_mask = None
         self.lambda_heat = lambda_heat
+        self.ownmask_threshold = 0.5
 
     def compute_delta(self, lambdas):
         lambdas_expand_one = lambdas.unsqueeze(1)
@@ -54,7 +55,11 @@ class SimpleMaskModule(nn.Module):
         return lambdamask  # This will be used for the next / dynamic mask.
 
     def __call__(self, lambda_prev=None, prev_mask=None, **kwargs):
-        self.own_mask = prev_mask  # If this is a Module of the first layer, this will be set to zero, to be used by "encoder/decoder. "
+        if prev_mask is not None:
+            self.own_mask = prev_mask * (torch.abs(prev_mask) > self.ownmask_threshold)
+        else:
+            self.own_mask = prev_mask
+        # If this is a Module of the first layer, this will be set to zero, to be used by "encoder/decoder. "
         dynamics_mask, lambdas_next = self.forward_mask(
             lambda_prev=None, prev_mask=prev_mask, **kwargs
         )

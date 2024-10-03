@@ -118,12 +118,10 @@ class MM_RotEncoder(MM_RotNet_AE):
             else:
                 H = layer(H)
                 H = torch.reshape(H, (H.shape[0], self.dim_m, -1))
-        aaa = torch.sum(torch.sum(H**2, dim=1), axis=0)
-        print(aaa)
+        # aaa = torch.sum(torch.sum(H**2, dim=1), axis=0)
 
         H = torch.reshape(H, (H.shape[0], self.dim_m, self.dim_a))
 
-        pdb.set_trace()
         return H
 
 

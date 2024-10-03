@@ -341,7 +341,9 @@ class DFNFT(NFT):
             plt.subplot(1, self.depth, k + 1)
             if self.nftlayers[k].PLambdaNet.dynamics_mask is not None:
                 plt.imshow(
-                    self.nftlayers[k].PLambdaNet.dynamics_mask.detach().to("cpu")
+                    torch.abs(self.nftlayers[k].PLambdaNet.dynamics_mask)
+                    .detach()
+                    .to("cpu")
                 )
             else:
                 print("Mask is None at this point yet")
@@ -594,7 +596,9 @@ class DFNFT_thruDec(DFNFT):
             plt.subplot(1, self.depth, k + 1)
             if self.nftlayers[k].PLambdaNet.dynamics_mask is not None:
                 plt.imshow(
-                    self.nftlayers[k].PLambdaNet.dynamics_mask.detach().to("cpu")
+                    torch.abs(self.nftlayers[k].PLambdaNet.dynamics_mask)
+                    .detach()
+                    .to("cpu")
                 )
             else:
                 print("Mask is None at this point yet")
